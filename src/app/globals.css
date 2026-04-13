@@ -1,0 +1,492 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   CSS CUSTOM PROPERTIES — DESIGN SYSTEM
+   ============================================================ */
+:root {
+  /* Background levels */
+  --color-bg-base: #050810;
+  --color-bg-surface: #0d1117;
+  --color-bg-interactive: #1a2035;
+
+  /* Accent colors */
+  --color-accent-blue: #3b82f6;
+  --color-accent-orange: #f97316;
+  --color-accent-purple: #a855f7;
+  --color-accent-cyan: #06b6d4;
+  --color-accent-green: #22c55e;
+  --color-accent-red: #ef4444;
+  --color-accent-gold: #eab308;
+  --color-accent-gray: #94a3b8;
+
+  /* Font */
+  --font-inter: 'Inter', sans-serif;
+
+  /* Timing functions */
+  --ease-attack: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-ui: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-powerup: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============================================================
+   GLOBAL RESET & BASE
+   ============================================================ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--color-bg-base);
+  color: #ffffff;
+  font-family: var(--font-inter), sans-serif;
+  font-weight: 400;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Remove inline-block gap on video elements */
+video {
+  display: block;
+}
+
+/* Remove default focus outlines */
+*:focus {
+  outline: none;
+}
+
+/* Custom focus-visible with blue glow */
+*:focus-visible {
+  outline: 2px solid var(--color-accent-blue);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25);
+  border-radius: 4px;
+}
+
+/* Prevent iOS default gestures on game canvases */
+.game-canvas {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ============================================================
+   SCROLLBAR STYLING — thin, dark
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-bg-interactive);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2a3550;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-bg-interactive) var(--color-bg-surface);
+}
+
+/* ============================================================
+   KEYFRAME ANIMATIONS
+   ============================================================ */
+
+/* Countdown number scale-in and fade */
+@keyframes countdown-scale {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.0);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+/* FIGHT! white screen flash overlay */
+@keyframes fight-flash {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.15;
+  }
+  60% {
+    opacity: 0.15;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* HP bar low-health and ready-state glow pulse */
+@keyframes glow-pulse {
+  0% {
+    transform: scale(1.0);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.0);
+    opacity: 1;
+  }
+}
+
+/* Screen shake translate sequence */
+@keyframes screen-shake {
+  0% {
+    transform: translate(0, 0);
+  }
+  10% {
+    transform: translate(-6px, -3px);
+  }
+  20% {
+    transform: translate(6px, 3px);
+  }
+  30% {
+    transform: translate(-5px, 2px);
+  }
+  40% {
+    transform: translate(5px, -2px);
+  }
+  50% {
+    transform: translate(-4px, -1px);
+  }
+  60% {
+    transform: translate(4px, 1px);
+  }
+  70% {
+    transform: translate(-2px, 2px);
+  }
+  80% {
+    transform: translate(2px, -1px);
+  }
+  90% {
+    transform: translate(-1px, 1px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+/* VSBadge border color cycling — blue → purple → orange */
+@keyframes border-color-cycle {
+  0% {
+    border-color: var(--color-accent-blue);
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.6), 0 0 24px rgba(59, 130, 246, 0.3);
+  }
+  33% {
+    border-color: var(--color-accent-purple);
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.6), 0 0 24px rgba(168, 85, 247, 0.3);
+  }
+  66% {
+    border-color: var(--color-accent-orange);
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.6), 0 0 24px rgba(249, 115, 22, 0.3);
+  }
+  100% {
+    border-color: var(--color-accent-blue);
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.6), 0 0 24px rgba(59, 130, 246, 0.3);
+  }
+}
+
+/* Shield dome shimmer diagonal sweep */
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-100%) skewX(-20deg);
+    opacity: 0;
+  }
+  40% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateX(200%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+
+/* Slow ambient pulse for waiting states */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Victory ring rotation */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Waiting dot stagger bounce */
+@keyframes dot-bounce {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.0);
+    opacity: 1;
+  }
+}
+
+/* Power card ready glow */
+@keyframes power-ready-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 4px rgba(59, 130, 246, 0.4),
+      0 0 8px rgba(59, 130, 246, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 8px rgba(59, 130, 246, 0.8),
+      0 0 16px rgba(59, 130, 246, 0.4),
+      0 0 24px rgba(59, 130, 246, 0.2);
+  }
+}
+
+/* PowerUnlockCard slide-up entrance */
+@keyframes slide-up-enter {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Toast slide-in from right */
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Toast slide-out to right */
+@keyframes toast-slide-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+}
+
+/* Gesture icon pulsing unlock glow */
+@keyframes gesture-icon-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 8px rgba(168, 85, 247, 0.4),
+      0 0 16px rgba(168, 85, 247, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 16px rgba(168, 85, 247, 0.9),
+      0 0 32px rgba(168, 85, 247, 0.5),
+      0 0 48px rgba(168, 85, 247, 0.2);
+  }
+}
+
+/* Camera icon electric blue ring pulse */
+@keyframes camera-ring-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(59, 130, 246, 0),
+      0 0 8px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 0 8px rgba(59, 130, 246, 0.15),
+      0 0 16px rgba(59, 130, 246, 0.5);
+  }
+}
+
+/* HP reconciliation correction overlay flash */
+@keyframes hp-correction-flash {
+  0% {
+    opacity: 0.1;
+  }
+  50% {
+    opacity: 0.1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ============================================================
+   ANIMATION UTILITY CLASSES
+   ============================================================ */
+.animate-countdown-scale {
+  animation: countdown-scale 500ms var(--ease-attack) forwards;
+}
+
+.animate-fight-flash {
+  animation: fight-flash 600ms var(--ease-ui) forwards;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 600ms ease-in-out infinite;
+}
+
+.animate-screen-shake {
+  animation: screen-shake 300ms var(--ease-attack) forwards;
+}
+
+.animate-border-color-cycle {
+  animation: border-color-cycle 3s linear infinite;
+}
+
+.animate-shimmer-sweep {
+  animation: shimmer-sweep 1.5s var(--ease-ui) infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 4s linear infinite;
+}
+
+.animate-dot-bounce {
+  animation: dot-bounce 1.2s ease-in-out infinite;
+}
+
+.animate-dot-bounce-delay-1 {
+  animation: dot-bounce 1.2s ease-in-out 0.4s infinite;
+}
+
+.animate-dot-bounce-delay-2 {
+  animation: dot-bounce 1.2s ease-in-out 0.8s infinite;
+}
+
+.animate-power-ready-glow {
+  animation: power-ready-glow 1.5s ease-in-out infinite;
+}
+
+.animate-slide-up-enter {
+  animation: slide-up-enter 500ms var(--ease-powerup) forwards;
+}
+
+.animate-toast-slide-in {
+  animation: toast-slide-in 250ms var(--ease-ui) forwards;
+}
+
+.animate-toast-slide-out {
+  animation: toast-slide-out 200ms var(--ease-ui) forwards;
+}
+
+.animate-gesture-icon-glow {
+  animation: gesture-icon-glow 1.2s ease-in-out infinite;
+}
+
+.animate-camera-ring-pulse {
+  animation: camera-ring-pulse 2s ease-in-out infinite;
+}
+
+.animate-hp-correction-flash {
+  animation: hp-correction-flash 150ms var(--ease-ui) forwards;
+}
+
+/* ============================================================
+   GRADIENT TEXT UTILITY
+   ============================================================ */
+.gradient-text-blue-purple {
+  background: linear-gradient(
+    90deg,
+    var(--color-accent-blue) 0%,
+    var(--color-accent-purple) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ============================================================
+   RANGE INPUT STYLING
+   ============================================================ */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--color-bg-interactive);
+  border-radius: 2px;
+  outline: none;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-accent-blue);
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.5);
+  transition: box-shadow 150ms var(--ease-ui);
+}
+
+input[type='range']::-webkit-slider-thumb:hover {
+  box-shadow:
+    0 0 10px rgba(59, 130, 246, 0.8),
+    0 0 20px rgba(59, 130, 246, 0.4);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-accent-blue);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.5);
+}

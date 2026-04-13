@@ -1,0 +1,456 @@
+'use client'
+
+import { useEffect, useRef, useState, useCallback } from 'react'
+import type { Socket } from 'socket.io-client'
+import {
+  HP_RECONCILE_SNAP_THRESHOLD,
+  COMBO_WINDOW_MS,
+  COMBO_PERFORMANCE_EXTENSION_MS,
+  ATTACK_PROJECTILE_DURATION_FIREBALL,
+  ATTACK_PROJECTILE_DURATION_ZAP,
+} from '@/lib/gameConstants'
+import { SOCKET_EVENTS, POWER_DEFINITIONS } from '@/lib/gameConstants.server'
+import {
+  applyGameEvent,
+  getComboProgress,
+  validateAttack,
+  isRoomStateValid,
+} from '@/services/gameStateService'
+import type {
+  RoomData,
+  AnimationState,
+  PlayerState,
+  GestureId,
+  VoiceKeyword,
+  FaceExpression,
+  ComboState,
+  PowerId,
+  SocketServerBroadcast,
+  SocketAttackPayload,
+  Projectile,
+  TileFilter,
+  PlayerSide,
+} from '@/types/game'
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+function makeTileFilter(): TileFilter {
+  return { grayscale: 0, sepia: 0, hueRotate: 0, saturate: 1, brightness: 1, contrast: 1 }
+}
+
+function makeInitialAnimationState(): AnimationState {
+  return {
+    activeProjectiles: [],
+    activeImpacts: [],
+    floatingTexts: [],
+    shakeAmplitude: { local: 0, remote: 0 },
+    tileFilters: { local: makeTileFilter(), remote: makeTileFilter() },
+  }
+}
+
+function makeInitialComboState(): ComboState {
+  return { sequence: [], target: null, windowExpiresAt: null, voiceRequired: null }
+}
+
+const GESTURE_TO_POWER_MAP: Partial<Record<GestureId, PowerId>> = {
+  fist: 'fire_punch',
+  open_palm: 'shield',
+  index_point: 'zap_shot',
+  shaka: 'heal',
+}
+
+function getProjectileDuration(power: PowerId): number {
+  if (power === 'zap_shot') return ATTACK_PROJECTILE_DURATION_ZAP
+  return ATTACK_PROJECTILE_DURATION_FIREBALL
+}
+
+function generateId(): string {
+  return Math.random().toString(36).slice(2, 9)
+}
+
+// ─── HOOK ─────────────────────────────────────────────────────────────────────
+
+export function useGameState(
+  socket: Socket | null,
+  roomCode: string,
+  localPlayerId: string
+): {
+  roomData: RoomData | null
+  animationState: AnimationState
+  localPlayerState: PlayerState | null
+  remotePlayerState: PlayerState | null
+  handleGesture: (gesture: GestureId) => void
+  handleVoiceKeyword: (keyword: VoiceKeyword) => void
+  handleFaceExpression: (expression: FaceExpression) => void
+  comboState: ComboState
+  sequenceNumber: number
+} {
+  const [roomData, setRoomData] = useState<RoomData | null>(() => {
+    if (typeof window === 'undefined') return null
+    return {
+      code: roomCode,
+      state: 'battle',
+      localPlayer: {
+        id: localPlayerId,
+        displayName: 'You',
+        hp: 100,
+        maxHp: 100,
+        activePower: null,
+        statusEffects: [],
+        statusTimers: {},
+        cooldowns: {},
+        unlockedPowers: ['fire_punch', 'shield', 'zap_shot', 'heal'],
+        winStreak: 0,
+        hasUsedFullRestore: false,
+      },
+      remotePlayer: {
+        id: 'remote',
+        displayName: 'Opponent',
+        hp: 100,
+        maxHp: 100,
+        activePower: null,
+        statusEffects: [],
+        statusTimers: {},
+        cooldowns: {},
+        unlockedPowers: ['fire_punch', 'shield', 'zap_shot', 'heal'],
+        winStreak: 0,
+        hasUsedFullRestore: false,
+      },
+      sequenceNumber: 0,
+    } as RoomData
+  })
+  const [animationState, setAnimationState] = useState<AnimationState>(makeInitialAnimationState())
+  const [comboState, setComboState] = useState<ComboState>(makeInitialComboState())
+  const [sequenceNumber, setSequenceNumber] = useState(0)
+
+  const lastSeqRef = useRef(0)
+  const seqCounterRef = useRef(0)
+  const warCryActiveRef = useRef(false)
+  const roomDataRef = useRef<RoomData | null>(null)
+  const comboStateRef = useRef<ComboState>(makeInitialComboState())
+  const animStateRef = useRef<AnimationState>(makeInitialAnimationState())
+
+  // Keep refs in sync with state for use in callbacks
+  useEffect(() => { roomDataRef.current = roomData }, [roomData])
+  useEffect(() => { comboStateRef.current = comboState }, [comboState])
+  useEffect(() => { animStateRef.current = animationState }, [animationState])
+
+  // Persist roomCode and playerId for reconnection
+  useEffect(() => {
+    if (roomCode) sessionStorage.setItem('roomCode', roomCode)
+    if (localPlayerId) sessionStorage.setItem('playerId', localPlayerId)
+  }, [roomCode, localPlayerId])
+
+  // ─── OPTIMISTIC ANIMATION HELPERS ──────────────────────────────────────────
+
+  const addProjectile = useCallback((power: PowerId, fromSide: PlayerSide) => {
+    const projectile: Projectile = {
+      id: generateId(),
+      type: power,
+      fromSide,
+      progress: 0,
+      startTime: Date.now(),
+      duration: getProjectileDuration(power),
+    }
+    setAnimationState((prev) => ({
+      ...prev,
+      activeProjectiles: [...prev.activeProjectiles, projectile],
+    }))
+    // Auto-remove after duration
+    setTimeout(() => {
+      setAnimationState((prev) => ({
+        ...prev,
+        activeProjectiles: prev.activeProjectiles.filter((p) => p.id !== projectile.id),
+      }))
+    }, projectile.duration + 100)
+  }, [])
+
+  const triggerShake = useCallback((side: PlayerSide, amplitude: number) => {
+    setAnimationState((prev) => ({
+      ...prev,
+      shakeAmplitude: { ...prev.shakeAmplitude, [side]: amplitude },
+    }))
+    setTimeout(() => {
+      setAnimationState((prev) => ({
+        ...prev,
+        shakeAmplitude: { ...prev.shakeAmplitude, [side]: 0 },
+      }))
+    }, 300)
+  }, [])
+
+  const triggerCorrectionFlash = useCallback((side: PlayerSide) => {
+    setAnimationState((prev) => ({
+      ...prev,
+      tileFilters: {
+        ...prev.tileFilters,
+        [side]: { ...prev.tileFilters[side], brightness: 1.5 },
+      },
+    }))
+    setTimeout(() => {
+      setAnimationState((prev) => ({
+        ...prev,
+        tileFilters: {
+          ...prev.tileFilters,
+          [side]: { ...prev.tileFilters[side], brightness: 1 },
+        },
+      }))
+    }, 150)
+  }, [])
+
+  // ─── SERVER BROADCAST HANDLER ───────────────────────────────────────────────
+
+  const handleServerBroadcast = useCallback(
+    (broadcast: SocketServerBroadcast) => {
+      const { sequenceNumber: serverSeq, localState, remoteState, event } = broadcast
+
+      // Reject out-of-order broadcasts
+      if (serverSeq <= lastSeqRef.current) return
+      lastSeqRef.current = serverSeq
+      setSequenceNumber(serverSeq)
+
+      setRoomData((prev) => {
+        if (!prev) return prev
+        const updatedRoom = applyGameEvent(prev, event)
+
+        // HP reconciliation: if server HP diverges beyond threshold, snap with flash
+        const localSide: PlayerSide = 'local'
+        const remoteSide: PlayerSide = 'remote'
+
+        const localHpDiff = Math.abs((localState?.hp ?? updatedRoom.localPlayer.hp) - updatedRoom.localPlayer.hp)
+        const remoteHpDiff = Math.abs((remoteState?.hp ?? updatedRoom.remotePlayer.hp) - updatedRoom.remotePlayer.hp)
+
+        let reconciledLocal = updatedRoom.localPlayer
+        let reconciledRemote = updatedRoom.remotePlayer
+
+        if (localHpDiff > HP_RECONCILE_SNAP_THRESHOLD && localState) {
+          reconciledLocal = { ...updatedRoom.localPlayer, hp: localState.hp }
+          triggerCorrectionFlash(localSide)
+        }
+        if (remoteHpDiff > HP_RECONCILE_SNAP_THRESHOLD && remoteState) {
+          reconciledRemote = { ...updatedRoom.remotePlayer, hp: remoteState.hp }
+          triggerCorrectionFlash(remoteSide)
+        }
+
+        // Trigger shake on defender on attack events
+        if (event.type === 'attack' && event.damage && event.damage > 0) {
+          const defenderIsLocal = event.targetId === localPlayerId
+          triggerShake(defenderIsLocal ? 'local' : 'remote', 6)
+        }
+
+        return {
+          ...updatedRoom,
+          localPlayer: reconciledLocal,
+          remotePlayer: reconciledRemote,
+        }
+      })
+    },
+    [localPlayerId, triggerCorrectionFlash, triggerShake]
+  )
+
+  // ─── SOCKET SUBSCRIPTIONS ──────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!socket) return
+
+    const onBroadcast = (data: SocketServerBroadcast) => handleServerBroadcast(data)
+
+    socket.on(SOCKET_EVENTS.SERVER_BROADCAST, onBroadcast)
+
+    return () => {
+      socket.off(SOCKET_EVENTS.SERVER_BROADCAST, onBroadcast)
+    }
+  }, [socket, handleServerBroadcast])
+
+  // ─── EMIT ATTACK ───────────────────────────────────────────────────────────
+
+  const emitAttack = useCallback(
+    (power: PowerId) => {
+      if (!socket) return
+      const room = roomDataRef.current
+      if (!room || !isRoomStateValid(room.state, 'attack')) return
+
+      const localPlayer = room.localPlayer
+      const now = Date.now()
+      const { valid } = validateAttack(localPlayer, power, now)
+      if (!valid) return
+
+      seqCounterRef.current += 1
+      const payload: SocketAttackPayload = {
+        roomCode,
+        playerId: localPlayerId,
+        power,
+        sequenceNumber: seqCounterRef.current,
+        timestamp: now,
+      }
+
+      socket.emit(SOCKET_EVENTS.GAME_EVENT, payload)
+
+      // Optimistic animation
+      addProjectile(power, 'local')
+    },
+    [socket, roomCode, localPlayerId, addProjectile]
+  )
+
+  // ─── HANDLE GESTURE ────────────────────────────────────────────────────────
+
+  const handleGesture = useCallback(
+    (gesture: GestureId) => {
+      const now = Date.now()
+      const currentCombo = comboStateRef.current
+
+      // Attempt combo progression first
+      const nextCombo = getComboProgress(currentCombo.sequence, gesture, currentCombo, now)
+      comboStateRef.current = nextCombo
+      setComboState(nextCombo)
+
+      // If combo is complete with gestures (voice may still be required)
+      if (nextCombo.target && !nextCombo.voiceRequired) {
+        emitAttack(nextCombo.target)
+        comboStateRef.current = makeInitialComboState()
+        setComboState(makeInitialComboState())
+        return
+      }
+
+      // If combo is in progress (partial), don't also fire a single-gesture power
+      if (nextCombo.sequence.length > 1 || nextCombo.target) return
+
+      // Single-gesture power mapping (Tier 1)
+      const power = GESTURE_TO_POWER_MAP[gesture]
+      if (!power) return
+
+      const def = POWER_DEFINITIONS[power]
+      if (!def) return
+
+      // Check if this gesture alone maps to a defend/heal type power
+      if (def.effect === 'shield' || power === 'shield') {
+        const room = roomDataRef.current
+        if (!room) return
+        const localPlayer = room.localPlayer
+        const { valid } = validateAttack(localPlayer, power, Date.now())
+        if (!valid) return
+
+        seqCounterRef.current += 1
+        const payload: SocketAttackPayload = {
+          roomCode,
+          playerId: localPlayerId,
+          power,
+          sequenceNumber: seqCounterRef.current,
+          timestamp: Date.now(),
+        }
+        socket?.emit(SOCKET_EVENTS.GAME_EVENT, payload)
+        return
+      }
+
+      if (power === 'heal') {
+        const room = roomDataRef.current
+        if (!room) return
+        const localPlayer = room.localPlayer
+        const { valid } = validateAttack(localPlayer, power, Date.now())
+        if (!valid) return
+
+        seqCounterRef.current += 1
+        const payload: SocketAttackPayload = {
+          roomCode,
+          playerId: localPlayerId,
+          power,
+          sequenceNumber: seqCounterRef.current,
+          timestamp: Date.now(),
+        }
+        socket?.emit(SOCKET_EVENTS.GAME_EVENT, payload)
+        return
+      }
+
+      emitAttack(power)
+    },
+    [emitAttack, roomCode, localPlayerId, socket]
+  )
+
+  // ─── HANDLE VOICE KEYWORD ──────────────────────────────────────────────────
+
+  const handleVoiceKeyword = useCallback(
+    (keyword: VoiceKeyword) => {
+      const currentCombo = comboStateRef.current
+      const now = Date.now()
+
+      // Check if voice keyword completes a pending combo
+      if (
+        currentCombo.target &&
+        currentCombo.voiceRequired === keyword &&
+        currentCombo.windowExpiresAt !== null &&
+        now < currentCombo.windowExpiresAt
+      ) {
+        emitAttack(currentCombo.target)
+        comboStateRef.current = makeInitialComboState()
+        setComboState(makeInitialComboState())
+      }
+    },
+    [emitAttack]
+  )
+
+  // ─── HANDLE FACE EXPRESSION ────────────────────────────────────────────────
+
+  const handleFaceExpression = useCallback(
+    (expression: FaceExpression) => {
+      if (expression === 'mouth_open') {
+        // WAR_CRY hold logic is in FaceEngine — by the time we receive this event,
+        // the hold threshold has been met. Set the war cry flag.
+        warCryActiveRef.current = true
+        // The war cry flag is communicated to the server as a status effect
+        // applied via the next attack event. The server applies the damage bonus.
+        // Optimistically update local animation state with war_cry status
+        setRoomData((prev) => {
+          if (!prev) return prev
+          const hasWarCry = prev.localPlayer.statusEffects.includes('war_cry')
+          if (hasWarCry) return prev
+          return {
+            ...prev,
+            localPlayer: {
+              ...prev.localPlayer,
+              statusEffects: [...prev.localPlayer.statusEffects, 'war_cry'],
+            },
+          }
+        })
+      } else if (expression === 'eyebrows_raised') {
+        // Cosmetic only — no gameplay effect
+      } else if (expression === 'eyes_squinting') {
+        // Extend active combo window
+        const current = comboStateRef.current
+        if (current.windowExpiresAt !== null) {
+          const extended: ComboState = {
+            ...current,
+            windowExpiresAt: current.windowExpiresAt + COMBO_PERFORMANCE_EXTENSION_MS,
+          }
+          comboStateRef.current = extended
+          setComboState(extended)
+        }
+      }
+    },
+    []
+  )
+
+  // ─── DERIVED STATE ─────────────────────────────────────────────────────────
+
+  const localPlayerState = roomData
+    ? roomData.localPlayer.id === localPlayerId
+      ? roomData.localPlayer
+      : roomData.remotePlayer
+    : null
+
+  const remotePlayerState = roomData
+    ? roomData.localPlayer.id === localPlayerId
+      ? roomData.remotePlayer
+      : roomData.localPlayer
+    : null
+
+  return {
+    roomData,
+    animationState,
+    localPlayerState,
+    remotePlayerState,
+    handleGesture,
+    handleVoiceKeyword,
+    handleFaceExpression,
+    comboState,
+    sequenceNumber,
+  }
+}
