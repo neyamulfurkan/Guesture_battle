@@ -45,6 +45,7 @@ function makeInitialAnimationState(): AnimationState {
     floatingTexts: [],
     shakeAmplitude: { local: 0, remote: 0 },
     tileFilters: { local: makeTileFilter(), remote: makeTileFilter() },
+    activeGestureActivation: null,
   }
 }
 
