@@ -30,7 +30,9 @@ class GestureStateMachine {
     this.frameCounts.set(gesture, current)
 
     if (current >= required) {
-      // Reset all other gesture counts
+      // Reset this gesture count to require full re-hold before firing again
+      this.frameCounts.set(gesture, 0)
+      // Reset all other gesture counts too
       for (const key of this.frameCounts.keys()) {
         if (key !== gesture) {
           this.frameCounts.set(key, 0)

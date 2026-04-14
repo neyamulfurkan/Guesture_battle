@@ -316,6 +316,23 @@ export function useGameState(
 
       socket.emit(SOCKET_EVENTS.GAME_EVENT, payload)
 
+      // Optimistically update cooldown so client-side validateAttack blocks duplicate sends
+      setRoomData((prev) => {
+        if (!prev) return prev
+        const updated = {
+          ...prev,
+          localPlayer: {
+            ...prev.localPlayer,
+            cooldowns: {
+              ...prev.localPlayer.cooldowns,
+              [power]: now,
+            },
+          },
+        }
+        roomDataRef.current = updated
+        return updated
+      })
+
       // Optimistic animation
       addProjectile(power, 'local')
     },
@@ -357,7 +374,8 @@ export function useGameState(
         const room = roomDataRef.current
         if (!room) return
         const localPlayer = room.localPlayer
-        const { valid } = validateAttack(localPlayer, power, Date.now())
+        const actionTime = Date.now()
+        const { valid } = validateAttack(localPlayer, power, actionTime)
         if (!valid) return
 
         seqCounterRef.current += 1
@@ -366,9 +384,13 @@ export function useGameState(
           playerId: localPlayerId,
           power,
           sequenceNumber: seqCounterRef.current,
-          timestamp: Date.now(),
+          timestamp: actionTime,
         }
         socket?.emit(SOCKET_EVENTS.GAME_EVENT, payload)
+        // Optimistically update cooldown
+        const updatedRoom = { ...room, localPlayer: { ...room.localPlayer, cooldowns: { ...room.localPlayer.cooldowns, [power]: actionTime } } }
+        roomDataRef.current = updatedRoom
+        setRoomData(updatedRoom)
         return
       }
 
@@ -376,7 +398,8 @@ export function useGameState(
         const room = roomDataRef.current
         if (!room) return
         const localPlayer = room.localPlayer
-        const { valid } = validateAttack(localPlayer, power, Date.now())
+        const actionTime = Date.now()
+        const { valid } = validateAttack(localPlayer, power, actionTime)
         if (!valid) return
 
         seqCounterRef.current += 1
@@ -385,9 +408,13 @@ export function useGameState(
           playerId: localPlayerId,
           power,
           sequenceNumber: seqCounterRef.current,
-          timestamp: Date.now(),
+          timestamp: actionTime,
         }
         socket?.emit(SOCKET_EVENTS.GAME_EVENT, payload)
+        // Optimistically update cooldown
+        const updatedRoom = { ...room, localPlayer: { ...room.localPlayer, cooldowns: { ...room.localPlayer.cooldowns, [power]: actionTime } } }
+        roomDataRef.current = updatedRoom
+        setRoomData(updatedRoom)
         return
       }
 
