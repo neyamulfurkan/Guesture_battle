@@ -62,11 +62,38 @@ export default function BattlePage() {
   const [countdownValue, setCountdownValue] = useState<number | 'FIGHT!' | null>(null)
   const [battleActive, setBattleActive] = useState(false)
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const countdownStartedRef = useRef(false)
 
   // ── Reconnection ────────────────────────────────────────────────────────────
   const [reconnectVisible, setReconnectVisible] = useState(false)
   const [reconnectSeconds, setReconnectSeconds] = useState(0)
   const reconnectIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // ── Countdown start (defined early so useEffect closures can reference it) ──
+  const startCountdown = useCallback(() => {
+    if (countdownStartedRef.current) return
+    countdownStartedRef.current = true
+    let count = COUNTDOWN_START
+    setCountdownValue(count)
+    audioManager.playSound('countdown_tick')
+
+    countdownTimerRef.current = setInterval(() => {
+      count -= 1
+      if (count > 0) {
+        setCountdownValue(count)
+        audioManager.playSound('countdown_tick')
+      } else if (count === 0) {
+        setCountdownValue('FIGHT!')
+        audioManager.playSound('fight_start')
+        clearInterval(countdownTimerRef.current!)
+        countdownTimerRef.current = null
+        setTimeout(() => {
+          setCountdownValue(null)
+          setBattleActive(true)
+        }, 1000)
+      }
+    }, 1000)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Battle events log ────────────────────────────────────────────────────────
   const [battleEvents, setBattleEvents] = useState<GameEvent[]>([])
@@ -198,12 +225,24 @@ export default function BattlePage() {
       roomCode: storedRoomCode,
       playerId: storedPlayerId,
       displayName: storedDisplayName,
-    }, () => {
+    }, (res?: { error?: string }) => {
+      if (res?.error) {
+        addToast(res.error, 'error')
+      }
       // After rejoining, initiate WebRTC
       initiate(isInitiator).catch((err: Error) => {
         addToast(err.message, 'error')
       })
     })
+
+    // Fallback: if ROOM_STATE_CHANGE fired before our listener registered, start countdown
+    const fallbackTimer = setTimeout(() => {
+      startCountdown()
+    }, 1200)
+
+    return () => {
+      clearTimeout(fallbackTimer)
+    }
   }, [socket, isConnected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Fallback toast ──────────────────────────────────────────────────────────
@@ -213,29 +252,7 @@ export default function BattlePage() {
     }
   }, [isUsingFallback]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Countdown start ─────────────────────────────────────────────────────────
-  const startCountdown = useCallback(() => {
-    let count = COUNTDOWN_START
-    setCountdownValue(count)
-    audioManager.playSound('countdown_tick')
-
-    countdownTimerRef.current = setInterval(() => {
-      count -= 1
-      if (count > 0) {
-        setCountdownValue(count)
-        audioManager.playSound('countdown_tick')
-      } else if (count === 0) {
-        setCountdownValue('FIGHT!')
-        audioManager.playSound('fight_start')
-        clearInterval(countdownTimerRef.current!)
-        countdownTimerRef.current = null
-        setTimeout(() => {
-          setCountdownValue(null)
-          setBattleActive(true)
-        }, 1000)
-      }
-    }, 1000)
-  }, [])
+  
 
   // ── Socket event subscriptions ──────────────────────────────────────────────
   useEffect(() => {

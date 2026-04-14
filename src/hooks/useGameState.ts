@@ -127,7 +127,37 @@ export function useGameState(
   const lastSeqRef = useRef(0)
   const seqCounterRef = useRef(0)
   const warCryActiveRef = useRef(false)
-  const roomDataRef = useRef<RoomData | null>(null)
+  const roomDataRef = useRef<RoomData | null>({
+    code: roomCode,
+    state: 'battle',
+    localPlayer: {
+      id: localPlayerId,
+      displayName: 'You',
+      hp: 100,
+      maxHp: 100,
+      activePower: null,
+      statusEffects: [],
+      statusTimers: {},
+      cooldowns: {},
+      unlockedPowers: ['fire_punch', 'shield', 'zap_shot', 'heal'],
+      winStreak: 0,
+      hasUsedFullRestore: false,
+    },
+    remotePlayer: {
+      id: 'remote',
+      displayName: 'Opponent',
+      hp: 100,
+      maxHp: 100,
+      activePower: null,
+      statusEffects: [],
+      statusTimers: {},
+      cooldowns: {},
+      unlockedPowers: ['fire_punch', 'shield', 'zap_shot', 'heal'],
+      winStreak: 0,
+      hasUsedFullRestore: false,
+    },
+    sequenceNumber: 0,
+  })
   const comboStateRef = useRef<ComboState>(makeInitialComboState())
   const animStateRef = useRef<AnimationState>(makeInitialAnimationState())
 

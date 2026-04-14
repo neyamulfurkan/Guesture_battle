@@ -72,8 +72,15 @@ io.on('connection', (socket: Socket) => {
         return
       }
 
-      if (room.state !== 'waiting' && room.state !== 'ready') {
-        callback?.({ error: 'This battle has already started. Create a new room to play.' })
+      // If room is in battle state, this is a reconnect from the battle page — attempt rejoin
+      if (room.state === 'battle' || room.state === 'ended') {
+        const rejoined = roomManager.rejoinPlayer(code, playerId, socket.id, io)
+        if (rejoined) {
+          socket.join(code)
+          callback?.({})
+        } else {
+          callback?.({ error: 'This battle has already ended. Create a new room to play.' })
+        }
         return
       }
 
@@ -154,11 +161,10 @@ io.on('connection', (socket: Socket) => {
         return
       }
 
-      const now = Date.now()
       const { playerId, power, sequenceNumber, timestamp } = payload
 
       const lastAttack = room.lastAttackTimestamp[playerId] ?? 0
-      if ((now - lastAttack) < (SERVER_RATE_LIMIT_ATTACK_MS ?? 800)) {
+      if ((timestamp - lastAttack) < (SERVER_RATE_LIMIT_ATTACK_MS ?? 800)) {
         socket.emit(SOCKET_EVENTS.RATE_LIMITED, { power })
         return
       }
@@ -264,7 +270,7 @@ const peersReady = room.peersReady
       }
 
       // When both peers are ready, transition to battle and start countdown
-      if (peersReady.size >= 2 && room.state === 'ready') {
+      if (peersReady.size >= 2 && (room.state === 'ready' || room.state === 'battle')) {
         room.state = 'battle'
         io.to(code).emit(SOCKET_EVENTS.ROOM_STATE_CHANGE, {
           state: 'battle',
