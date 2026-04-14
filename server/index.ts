@@ -252,9 +252,24 @@ io.on('connection', (socket: Socket) => {
       const code = payload.roomCode.toUpperCase()
       const room = roomManager.getRoom(code)
       if (!room) return
+
+      // Track how many peers have signaled ready
+room.peersReady.add(socket.id)
+const peersReady = room.peersReady
+
+      // Relay to the other peer so initiator can send offer
       const targetSocketId = getTargetSocketId(room, socket.id)
       if (targetSocketId) {
         io.to(targetSocketId).emit('peer_ready', { fromId: socket.id })
+      }
+
+      // When both peers are ready, transition to battle and start countdown
+      if (peersReady.size >= 2 && room.state === 'ready') {
+        room.state = 'battle'
+        io.to(code).emit(SOCKET_EVENTS.ROOM_STATE_CHANGE, {
+          state: 'battle',
+          roomCode: code,
+        })
       }
     } catch (err) {
       console.error('PEER_READY error:', err)

@@ -263,10 +263,13 @@ export function useWebRTC(socket: Socket | null): {
       // Notify server we are ready — server will relay to peer
       socket.emit('peer_ready', { roomCode: sessionStorage.getItem('roomCode') ?? '' })
 
-      // Initiator sends offer only after receiving peer_ready back (meaning both sides ready)
+      // Initiator sends offer after receiving peer_ready from non-initiator
+      // Non-initiator just waits for the offer
       if (isInitiator) {
-        const handlePeerReady = async () => {
-          socket.off('peer_ready', handlePeerReady)
+        let offerSent = false
+        const sendOffer = async () => {
+          if (offerSent) return
+          offerSent = true
           try {
             const offer = await pc.createOffer()
             const modifiedSDP = modifySDP(offer.sdp ?? '')
@@ -279,7 +282,16 @@ export function useWebRTC(socket: Socket | null): {
             console.error('Offer creation failed:', err)
           }
         }
+        const handlePeerReady = () => {
+          socket.off('peer_ready', handlePeerReady)
+          sendOffer()
+        }
         socket.on('peer_ready', handlePeerReady)
+        // Fallback: if peer_ready never arrives within 3s, send offer anyway
+        setTimeout(() => {
+          socket.off('peer_ready', handlePeerReady)
+          sendOffer()
+        }, 3000)
       }
 
       // ── Connection timeout ─────────────────────────────────────────────────

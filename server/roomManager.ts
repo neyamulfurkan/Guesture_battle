@@ -19,6 +19,7 @@ export interface ServerRoom extends RoomData {
   disconnectTimers: Record<string, NodeJS.Timeout>
   createdAt: number
   endedAt?: number
+  peersReady: Set<string>
 }
 
 export type ReconnectOrForfeit =
@@ -66,6 +67,7 @@ export class RoomManager {
       lastAttackTimestamp: {},
       disconnectTimers: {},
       createdAt: Date.now(),
+      peersReady: new Set<string>(),
     }
     this.rooms.set(code, room)
     return room
