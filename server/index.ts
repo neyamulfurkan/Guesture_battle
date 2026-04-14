@@ -245,6 +245,22 @@ io.on('connection', (socket: Socket) => {
     }
   )
 
+  // ── PEER READY ─────────────────────────────────────────────────────────────
+  socket.on('peer_ready', (payload: { roomCode: string }) => {
+    try {
+      if (!payload || !payload.roomCode) return
+      const code = payload.roomCode.toUpperCase()
+      const room = roomManager.getRoom(code)
+      if (!room) return
+      const targetSocketId = getTargetSocketId(room, socket.id)
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('peer_ready', { fromId: socket.id })
+      }
+    } catch (err) {
+      console.error('PEER_READY error:', err)
+    }
+  })
+
   // ── DISCONNECT ─────────────────────────────────────────────────────────────
   socket.on('disconnect', () => {
     try {

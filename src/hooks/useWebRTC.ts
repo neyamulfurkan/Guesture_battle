@@ -217,15 +217,9 @@ export function useWebRTC(socket: Socket | null): {
       }
 
       // ── Negotiation (SDP offer/answer) ─────────────────────────────────────
+      // Initiator manually triggers offer after peer_ready — onnegotiationneeded disabled
       pc.onnegotiationneeded = async () => {
-        try {
-          const offer = await pc.createOffer()
-          const modifiedSDP = modifySDP(offer.sdp ?? '')
-          await pc.setLocalDescription({ type: offer.type, sdp: modifiedSDP })
-          socket.emit(SOCKET_EVENTS.SIGNAL_OFFER, { offer: pc.localDescription, roomCode: sessionStorage.getItem('roomCode') ?? '' })
-        } catch (err) {
-          console.error('Negotiation failed:', err)
-        }
+        // Intentionally empty — offer is triggered manually below for initiator
       }
 
       // ── Receive offer (non-initiator) ──────────────────────────────────────
@@ -265,6 +259,28 @@ export function useWebRTC(socket: Socket | null): {
       socket.on(SOCKET_EVENTS.SIGNAL_OFFER, handleOffer)
       socket.on(SOCKET_EVENTS.SIGNAL_ANSWER, handleAnswer)
       socket.on(SOCKET_EVENTS.SIGNAL_ICE, handleICE)
+
+      // Notify server we are ready — server will relay to peer
+      socket.emit('peer_ready', { roomCode: sessionStorage.getItem('roomCode') ?? '' })
+
+      // Initiator sends offer only after receiving peer_ready back (meaning both sides ready)
+      if (isInitiator) {
+        const handlePeerReady = async () => {
+          socket.off('peer_ready', handlePeerReady)
+          try {
+            const offer = await pc.createOffer()
+            const modifiedSDP = modifySDP(offer.sdp ?? '')
+            await pc.setLocalDescription({ type: offer.type, sdp: modifiedSDP })
+            socket.emit(SOCKET_EVENTS.SIGNAL_OFFER, {
+              offer: pc.localDescription,
+              roomCode: sessionStorage.getItem('roomCode') ?? '',
+            })
+          } catch (err) {
+            console.error('Offer creation failed:', err)
+          }
+        }
+        socket.on('peer_ready', handlePeerReady)
+      }
 
       // ── Connection timeout ─────────────────────────────────────────────────
       connectionTimerRef.current = setTimeout(() => {
