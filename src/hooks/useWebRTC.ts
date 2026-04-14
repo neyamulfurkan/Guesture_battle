@@ -121,7 +121,8 @@ export function useWebRTC(socket: Socket | null): {
           reject(new Error('Camera access timed out. Check that your camera is connected and try again.'))
         }, GET_USER_MEDIA_TIMEOUT_MS)
 
-        navigator.mediaDevices
+        const attemptGetUserMedia = (attemptsLeft: number) => {
+          navigator.mediaDevices
           .getUserMedia({
             video: { width: 640, height: 480, frameRate: 30 },
             audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
@@ -131,6 +132,11 @@ export function useWebRTC(socket: Socket | null): {
             resolve(s)
           })
           .catch((err: Error) => {
+            if (err.name === 'NotReadableError' && attemptsLeft > 0) {
+              // Camera may still be releasing from previous page — retry after 500ms
+              setTimeout(() => attemptGetUserMedia(attemptsLeft - 1), 500)
+              return
+            }
             clearTimeout(timer)
             if (err.name === 'NotAllowedError') {
               reject(new Error('Camera access was denied. Allow camera and microphone access in your browser settings and try again.'))
@@ -142,6 +148,8 @@ export function useWebRTC(socket: Socket | null): {
               reject(new Error(`Camera error: ${err.message}`))
             }
           })
+        }
+        attemptGetUserMedia(5)
       })
 
       localStreamRef.current = stream

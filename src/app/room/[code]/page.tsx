@@ -204,6 +204,10 @@ if (!isConnected) return
         hasNavigated.current = true
         const rc = roomCodeRef.current || data.roomCode || roomCode
         if (rc) {
+          // Stop camera tracks before navigating so battle page can acquire camera cleanly
+          streamRef.current?.getTracks().forEach((t) => t.stop())
+          streamRef.current = null
+          setStream(null)
           router.push(`/room/${rc}/battle`)
         }
       }

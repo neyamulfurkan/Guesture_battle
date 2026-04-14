@@ -145,7 +145,7 @@ export default function BattlePage() {
   const { isDetecting, isHandDetected, landmarkData } = useGestureEngine(
     gestureSourceVideoRef,
     onGestureWrapped,
-    !!localStream
+    !!localStream && battleActive
   )
 
   const { isSupported: isSpeechSupported, isListening, lastKeyword } = useSpeechEngine(
