@@ -113,6 +113,8 @@ export class RoomManager {
     if (side === 'remote') {
       // Both players present — transition to ready
       room.state = 'ready'
+      // Clear any stale peersReady — fresh peer_ready signals will come from battle page
+      room.peersReady.clear()
 
       const localSocketId = room.socketIds['local']
       const remoteSocketId = room.socketIds['remote']
@@ -158,25 +160,38 @@ export class RoomManager {
     // Replace socket ID
     room.socketIds[side] = newSocketId
 
-    // Only notify opponent of reconnect if there was an actual disconnect (timer was pending)
-    if (hadDisconnectTimer) {
-      const opponentSide: PlayerSide = side === 'local' ? 'remote' : 'local'
-      const opponentSocketId = room.socketIds[opponentSide]
-      if (opponentSocketId && io) {
-        io.to(opponentSocketId).emit(SOCKET_EVENTS.OPPONENT_RECONNECTED, {
-          playerId: oldPlayerId,
-          side,
-        })
-      }
+    // Clear stale peersReady socket IDs — new peer_ready signals needed from new socket IDs
+    room.peersReady.clear()
+
+    const opponentSide: PlayerSide = side === 'local' ? 'remote' : 'local'
+    const opponentSocketId = room.socketIds[opponentSide]
+
+    // Notify opponent of reconnect if there was an actual mid-battle disconnect
+    if (hadDisconnectTimer && opponentSocketId && io) {
+      io.to(opponentSocketId).emit(SOCKET_EVENTS.OPPONENT_RECONNECTED, {
+        playerId: oldPlayerId,
+        side,
+      })
     }
 
-    // Send current room state to the rejoining player
+    // Always send current room state to the rejoining player
     io?.to(newSocketId).emit(SOCKET_EVENTS.ROOM_STATE_CHANGE, {
       state: room.state,
       localPlayer: side === 'local' ? room.localPlayer : room.remotePlayer,
       remotePlayer: side === 'local' ? room.remotePlayer : room.localPlayer,
       code: room.code,
     })
+
+    // If room is in 'ready' state, also send state to opponent so both sides
+    // know to proceed with WebRTC initiation
+    if (room.state === 'ready' && opponentSocketId && io) {
+      io.to(opponentSocketId).emit(SOCKET_EVENTS.ROOM_STATE_CHANGE, {
+        state: room.state,
+        localPlayer: opponentSide === 'local' ? room.localPlayer : room.remotePlayer,
+        remotePlayer: opponentSide === 'local' ? room.remotePlayer : room.localPlayer,
+        code: room.code,
+      })
+    }
 
     return true
   }
@@ -210,9 +225,13 @@ export class RoomManager {
     if (!disconnectedPlayerId) return { type: 'not_found' }
 
     if (room.state !== 'battle') {
-      // Outside battle — just clean up
+      // Outside battle — clear socket ID but keep playerIdToSide entry
+      // so the player can rejoin from the battle page with a new socket ID
       delete room.socketIds[disconnectedSide]
-      delete room.playerIdToSide[disconnectedPlayerId]
+      if (room.state === 'waiting') {
+        // Only fully remove player if room is still waiting (no opponent yet)
+        delete room.playerIdToSide[disconnectedPlayerId]
+      }
       return { type: 'not_in_battle' }
     }
 
