@@ -6,7 +6,7 @@ import { ICE_SERVERS, SOCKET_EVENTS } from '@/lib/gameConstants.server'
 import type { GameEvent, SocketAttackPayload } from '@/types/game'
 
 const GET_USER_MEDIA_TIMEOUT_MS = 10_000
-const WEBRTC_CONNECTION_TIMEOUT_MS = 15_000
+const WEBRTC_CONNECTION_TIMEOUT_MS = 30_000
 const ICE_DISCONNECT_RESTART_DELAY_MS = 5_000
 
 function modifySDP(sdp: string): string {
@@ -208,9 +208,8 @@ pc.oniceconnectionstatechange = () => {
             connectionTimerRef.current = null
           }
         } else if (state === 'failed') {
+          // Attempt ICE restart first — TURN servers may establish relay after restart
           pcRef.current?.restartIce()
-          fallbackToSocketRef.current = true
-          setIsUsingFallback(true)
         } else if (state === 'closed') {
           socket.emit('connectionClosed')
         }
@@ -291,11 +290,16 @@ const handlePeerReady = () => {
       }
 
       // ── Connection timeout ─────────────────────────────────────────────────
+      // Only fall back game DATA to socket if WebRTC data channel never opened.
+      // Video has no socket fallback — if ICE fails, opponent video stays black.
       connectionTimerRef.current = setTimeout(() => {
         const state = pcRef.current?.iceConnectionState
         if (state !== 'connected' && state !== 'completed') {
-          fallbackToSocketRef.current = true
-          setIsUsingFallback(true)
+          // Data channel fallback only — socket relay handles game events
+          if (!dataChannelRef.current || dataChannelRef.current.readyState !== 'open') {
+            fallbackToSocketRef.current = true
+            setIsUsingFallback(true)
+          }
         }
       }, WEBRTC_CONNECTION_TIMEOUT_MS)
     },

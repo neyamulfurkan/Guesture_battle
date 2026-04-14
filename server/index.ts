@@ -167,14 +167,17 @@ io.on('connection', (socket: Socket) => {
         return
       }
 
-      const { playerId, power, sequenceNumber, timestamp } = payload
-      const clampedTimestamp = Math.min(timestamp, Date.now())
+      const { playerId, power, sequenceNumber } = payload
+      const serverNow = Date.now()
 
       const lastAttack = room.lastAttackTimestamp[playerId] ?? 0
-      if ((clampedTimestamp - lastAttack) < (SERVER_RATE_LIMIT_ATTACK_MS ?? 800)) {
+      if (serverNow - lastAttack < SERVER_RATE_LIMIT_ATTACK_MS) {
         socket.emit(SOCKET_EVENTS.RATE_LIMITED, { power })
         return
       }
+
+      // Record timestamp here using server time so both checks use the same clock
+      room.lastAttackTimestamp[playerId] = serverNow
 
       const gameEvent: GameEvent = {
         type: 'attack',
@@ -185,7 +188,7 @@ io.on('connection', (socket: Socket) => {
             ? room.remotePlayer.id
             : room.localPlayer.id,
         sequenceNumber,
-        timestamp: clampedTimestamp,
+        timestamp: serverNow,
       }
 
       gameEngine.processGameEvent(room, gameEvent, io)

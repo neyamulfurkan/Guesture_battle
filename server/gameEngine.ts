@@ -40,20 +40,7 @@ export class GameEngine {
       return
     }
 
-    // Rate limiting: reject attack events arriving too quickly from the same player
     if (event.type === 'attack') {
-      const lastTs = room.lastAttackTimestamp[event.attackerId]
-      if (lastTs !== undefined && event.timestamp - lastTs < SERVER_RATE_LIMIT_ATTACK_MS) {
-        // Emit rate_limited only to the attacker's socket
-        const attackerSocket = this._socketForPlayer(room, event.attackerId)
-        if (attackerSocket) {
-          io.to(attackerSocket).emit(SOCKET_EVENTS.RATE_LIMITED, {
-            reason: 'Attack rate limit exceeded.',
-          })
-        }
-        return
-      }
-
       // Validate the attack against the attacker's current state
       const attackerState = this._stateForPlayer(room, event.attackerId)
       if (!attackerState) return
@@ -62,9 +49,6 @@ export class GameEngine {
       if (!validation.valid) {
         return
       }
-
-      // Record attack timestamp for future rate limiting
-      room.lastAttackTimestamp[event.attackerId] = event.timestamp
     }
 
     // Apply the event immutably via gameStateService
