@@ -148,6 +148,7 @@ export class RoomManager {
     if (!side) return false
 
     // Cancel any pending disconnect/forfeit timer
+    const hadDisconnectTimer = oldPlayerId in room.disconnectTimers
     const existingTimer = room.disconnectTimers[oldPlayerId]
     if (existingTimer) {
       clearTimeout(existingTimer)
@@ -157,14 +158,16 @@ export class RoomManager {
     // Replace socket ID
     room.socketIds[side] = newSocketId
 
-    // Notify the opponent
-    const opponentSide: PlayerSide = side === 'local' ? 'remote' : 'local'
-    const opponentSocketId = room.socketIds[opponentSide]
-    if (opponentSocketId && io) {
-      io.to(opponentSocketId).emit(SOCKET_EVENTS.OPPONENT_RECONNECTED, {
-        playerId: oldPlayerId,
-        side,
-      })
+    // Only notify opponent of reconnect if there was an actual disconnect (timer was pending)
+    if (hadDisconnectTimer) {
+      const opponentSide: PlayerSide = side === 'local' ? 'remote' : 'local'
+      const opponentSocketId = room.socketIds[opponentSide]
+      if (opponentSocketId && io) {
+        io.to(opponentSocketId).emit(SOCKET_EVENTS.OPPONENT_RECONNECTED, {
+          playerId: oldPlayerId,
+          side,
+        })
+      }
     }
 
     // Send current room state to the rejoining player
@@ -309,6 +312,14 @@ export class RoomManager {
       }
     }
     return null
+  }
+
+  // ── isPlayerInRoom ─────────────────────────────────────────────────────────
+
+  isPlayerInRoom(code: string, playerId: string): boolean {
+    const room = this.rooms.get(code)
+    if (!room) return false
+    return playerId in room.playerIdToSide
   }
 
   // ── listRooms ──────────────────────────────────────────────────────────────

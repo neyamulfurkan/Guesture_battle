@@ -72,15 +72,21 @@ io.on('connection', (socket: Socket) => {
         return
       }
 
-      // If room is in battle state, this is a reconnect from the battle page — attempt rejoin
-      if (room.state === 'battle' || room.state === 'ended') {
+      // If this player is already known in the room (any state), treat as a socket reconnect
+      const isKnownPlayer = roomManager.isPlayerInRoom(code, playerId)
+      if (isKnownPlayer) {
         const rejoined = roomManager.rejoinPlayer(code, playerId, socket.id, io)
         if (rejoined) {
           socket.join(code)
           callback?.({})
         } else {
-          callback?.({ error: 'This battle has already ended. Create a new room to play.' })
+          callback?.({ error: 'Could not reconnect to room. Please create a new room.' })
         }
+        return
+      }
+
+      if (room.state !== 'waiting') {
+        callback?.({ error: 'This battle has already started. Create a new room to play.' })
         return
       }
 
@@ -162,9 +168,10 @@ io.on('connection', (socket: Socket) => {
       }
 
       const { playerId, power, sequenceNumber, timestamp } = payload
+      const clampedTimestamp = Math.min(timestamp, Date.now())
 
       const lastAttack = room.lastAttackTimestamp[playerId] ?? 0
-      if ((timestamp - lastAttack) < (SERVER_RATE_LIMIT_ATTACK_MS ?? 800)) {
+      if ((clampedTimestamp - lastAttack) < (SERVER_RATE_LIMIT_ATTACK_MS ?? 800)) {
         socket.emit(SOCKET_EVENTS.RATE_LIMITED, { power })
         return
       }
@@ -178,7 +185,7 @@ io.on('connection', (socket: Socket) => {
             ? room.remotePlayer.id
             : room.localPlayer.id,
         sequenceNumber,
-        timestamp,
+        timestamp: clampedTimestamp,
       }
 
       gameEngine.processGameEvent(room, gameEvent, io)
