@@ -366,6 +366,25 @@ export default function BattlePage() {
     }
   }, [])
 
+  // ── Debug log overlay ───────────────────────────────────────────────────────
+  const [debugLogs, setDebugLogs] = useState<string[]>([])
+  const addDebugLog = useCallback((msg: string) => {
+    const time = new Date().toLocaleTimeString('en', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    setDebugLogs((prev) => [...prev.slice(-12), `${time} ${msg}`])
+  }, [])
+
+  useEffect(() => {
+    const orig = console.log.bind(console)
+    console.log = (...args: unknown[]) => {
+      orig(...args)
+      const msg = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')
+      if (msg.includes('[WebRTC]') || msg.includes('[Socket]')) {
+        addDebugLog(msg)
+      }
+    }
+    return () => { console.log = orig }
+  }, [addDebugLog])
+
   // ── Derived ─────────────────────────────────────────────────────────────────
   const localState = localPlayerState
   const remoteState = remotePlayerState
@@ -558,6 +577,39 @@ export default function BattlePage() {
         settings={settings}
         onSettingsChange={setSettings}
       />
+
+      {/* ── DEBUG OVERLAY ─────────────────────────────────────────────────── */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          zIndex: 9999,
+          background: 'rgba(0,0,0,0.85)',
+          color: '#00ff88',
+          fontSize: 10,
+          fontFamily: 'monospace',
+          padding: '4px 8px',
+          maxWidth: '60vw',
+          maxHeight: '40vh',
+          overflow: 'auto',
+          pointerEvents: 'none',
+          borderRight: '1px solid #00ff8844',
+          borderBottom: '1px solid #00ff8844',
+        }}
+      >
+        <div style={{ color: '#ffffff88', marginBottom: 2 }}>
+          SOCKET:{isConnected ? '✅' : '❌'} | 
+          LOCAL:{localStream ? '✅' : '❌'} | 
+          REMOTE:{remoteStream ? '✅' : '❌'} | 
+          INITIATOR:{sessionStorage.getItem('isInitiator')}
+        </div>
+        {debugLogs.map((log, i) => (
+          <div key={i} style={{ borderBottom: '1px solid #ffffff11', paddingBottom: 1, marginBottom: 1 }}>
+            {log}
+          </div>
+        ))}
+      </div>
 
       {/* Performance mode indicator (development hint) */}
       {performanceMode !== 'full' && (

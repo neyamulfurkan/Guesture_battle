@@ -190,9 +190,10 @@ export function useWebRTC(socket: Socket | null): {
       }
 
       // ── ICE connection state ───────────────────────────────────────────────
-      pc.oniceconnectionstatechange = () => {
-        const state = pc.iceConnectionState
-        setConnectionState(state)
+pc.oniceconnectionstatechange = () => {
+const state = pc.iceConnectionState
+console.log('[WebRTC] ICE connection state:', state)
+setConnectionState(state)
 
         if (state === 'disconnected') {
           disconnectTimerRef.current = setTimeout(() => {
@@ -216,6 +217,8 @@ export function useWebRTC(socket: Socket | null): {
         }
       }
 
+      console.log('[WebRTC] initiate called, isInitiator:', isInitiator)
+
       // ── Negotiation (SDP offer/answer) ─────────────────────────────────────
       // Initiator manually triggers offer after peer_ready — onnegotiationneeded disabled
       pc.onnegotiationneeded = async () => {
@@ -223,10 +226,11 @@ export function useWebRTC(socket: Socket | null): {
       }
 
       // ── Receive offer (non-initiator) ──────────────────────────────────────
-      const handleOffer = async (data: { offer: RTCSessionDescriptionInit }) => {
-        if (!pcRef.current) return
-        try {
-          await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.offer))
+const handleOffer = async (data: { offer: RTCSessionDescriptionInit }) => {
+console.log('[WebRTC] handleOffer received', data)
+if (!pcRef.current) return
+try {
+await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.offer))
           const answer = await pcRef.current.createAnswer()
           const modifiedSDP = modifySDP(answer.sdp ?? '')
           await pcRef.current.setLocalDescription({ type: answer.type, sdp: modifiedSDP })
@@ -237,10 +241,11 @@ export function useWebRTC(socket: Socket | null): {
       }
 
       // ── Receive answer (initiator) ─────────────────────────────────────────
-      const handleAnswer = async (data: { answer: RTCSessionDescriptionInit }) => {
-        if (!pcRef.current) return
-        try {
-          await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.answer))
+const handleAnswer = async (data: { answer: RTCSessionDescriptionInit }) => {
+console.log('[WebRTC] handleAnswer received', data)
+if (!pcRef.current) return
+try {
+await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.answer))
         } catch (err) {
           console.error('Failed to handle answer:', err)
         }
@@ -256,13 +261,11 @@ export function useWebRTC(socket: Socket | null): {
         }
       }
 
-      socket.on(SOCKET_EVENTS.SIGNAL_OFFER, handleOffer)
-      socket.on(SOCKET_EVENTS.SIGNAL_ANSWER, handleAnswer)
-      socket.on(SOCKET_EVENTS.SIGNAL_ICE, handleICE)
-
-      // Notify server we are ready — server will relay to peer
-      socket.emit('peer_ready', { roomCode: sessionStorage.getItem('roomCode') ?? '' })
-
+socket.on(SOCKET_EVENTS.SIGNAL_OFFER, handleOffer)
+socket.on(SOCKET_EVENTS.SIGNAL_ANSWER, handleAnswer)
+socket.on(SOCKET_EVENTS.SIGNAL_ICE, handleICE)
+  console.log('[WebRTC] listeners registered, emitting peer_ready, isInitiator:', isInitiator)
+  socket.emit('peer_ready', { roomCode: sessionStorage.getItem('roomCode') ?? '' })
       // Initiator sends offer after receiving peer_ready from non-initiator
       // Non-initiator just waits for the offer
       if (isInitiator) {
@@ -282,16 +285,18 @@ export function useWebRTC(socket: Socket | null): {
             console.error('Offer creation failed:', err)
           }
         }
-        const handlePeerReady = () => {
-          socket.off('peer_ready', handlePeerReady)
-          sendOffer()
-        }
-        socket.on('peer_ready', handlePeerReady)
-        // Fallback: if peer_ready never arrives within 3s, send offer anyway
-        setTimeout(() => {
-          socket.off('peer_ready', handlePeerReady)
-          sendOffer()
-        }, 3000)
+const handlePeerReady = () => {
+console.log('[WebRTC] peer_ready received by initiator, sending offer')
+socket.off('peer_ready', handlePeerReady)
+sendOffer()
+}
+socket.on('peer_ready', handlePeerReady)
+// Fallback: if peer_ready never arrives within 3s, send offer anyway
+setTimeout(() => {
+console.log('[WebRTC] peer_ready fallback timeout fired, sending offer anyway')
+socket.off('peer_ready', handlePeerReady)
+sendOffer()
+}, 3000)
       }
 
       // ── Connection timeout ─────────────────────────────────────────────────
