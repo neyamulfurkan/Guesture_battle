@@ -191,9 +191,8 @@ export function useWebRTC(socket: Socket | null): {
 
       // ── ICE connection state ───────────────────────────────────────────────
 pc.oniceconnectionstatechange = () => {
-const state = pc.iceConnectionState
-console.log('[WebRTC] ICE connection state:', state)
-setConnectionState(state)
+        const state = pc.iceConnectionState
+        setConnectionState(state)
 
         if (state === 'disconnected') {
           disconnectTimerRef.current = setTimeout(() => {
@@ -217,8 +216,6 @@ setConnectionState(state)
         }
       }
 
-      console.log('[WebRTC] initiate called, isInitiator:', isInitiator)
-
       // ── Negotiation (SDP offer/answer) ─────────────────────────────────────
       // Initiator manually triggers offer after peer_ready — onnegotiationneeded disabled
       pc.onnegotiationneeded = async () => {
@@ -227,7 +224,6 @@ setConnectionState(state)
 
       // ── Receive offer (non-initiator) ──────────────────────────────────────
 const handleOffer = async (data: { offer: RTCSessionDescriptionInit }) => {
-console.log('[WebRTC] handleOffer received', data)
 if (!pcRef.current) return
 try {
 await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.offer))
@@ -242,7 +238,6 @@ await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.offer))
 
       // ── Receive answer (initiator) ─────────────────────────────────────────
 const handleAnswer = async (data: { answer: RTCSessionDescriptionInit }) => {
-console.log('[WebRTC] handleAnswer received', data)
 if (!pcRef.current) return
 try {
 await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.answer))
@@ -264,8 +259,7 @@ await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.answer))
 socket.on(SOCKET_EVENTS.SIGNAL_OFFER, handleOffer)
 socket.on(SOCKET_EVENTS.SIGNAL_ANSWER, handleAnswer)
 socket.on(SOCKET_EVENTS.SIGNAL_ICE, handleICE)
-  console.log('[WebRTC] listeners registered, emitting peer_ready, isInitiator:', isInitiator)
-  socket.emit('peer_ready', { roomCode: sessionStorage.getItem('roomCode') ?? '' })
+socket.emit('peer_ready', { roomCode: sessionStorage.getItem('roomCode') ?? '' })
       // Initiator sends offer after receiving peer_ready from non-initiator
       // Non-initiator just waits for the offer
       if (isInitiator) {
@@ -286,17 +280,14 @@ socket.on(SOCKET_EVENTS.SIGNAL_ICE, handleICE)
           }
         }
 const handlePeerReady = () => {
-console.log('[WebRTC] peer_ready received by initiator, sending offer')
-socket.off('peer_ready', handlePeerReady)
-sendOffer()
-}
-socket.on('peer_ready', handlePeerReady)
-// Fallback: if peer_ready never arrives within 3s, send offer anyway
-setTimeout(() => {
-console.log('[WebRTC] peer_ready fallback timeout fired, sending offer anyway')
-socket.off('peer_ready', handlePeerReady)
-sendOffer()
-}, 3000)
+          socket.off('peer_ready', handlePeerReady)
+          sendOffer()
+        }
+        socket.on('peer_ready', handlePeerReady)
+        setTimeout(() => {
+          socket.off('peer_ready', handlePeerReady)
+          sendOffer()
+        }, 3000)
       }
 
       // ── Connection timeout ─────────────────────────────────────────────────

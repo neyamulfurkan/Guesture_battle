@@ -39,7 +39,6 @@ export function useSocket(): {
 
     socket.on('connect', () => {
       setIsConnected(true)
-      console.log('[Socket] connected id:', socket.id)
     })
 
     socket.on('disconnect', () => {
