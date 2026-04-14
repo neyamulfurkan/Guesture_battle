@@ -303,7 +303,7 @@ export default function BattlePage() {
     }
 
     const handleRoomStateChange = (data: { state: string; localPlayerId?: string }) => {
-      if (data?.state === 'battle' || data?.state === 'ready') {
+      if (data?.state === 'battle') {
         startCountdown()
       }
     }

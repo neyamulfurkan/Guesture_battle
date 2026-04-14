@@ -214,31 +214,31 @@ export function useWebRTC(socket: Socket | null): {
           const offer = await pc.createOffer()
           const modifiedSDP = modifySDP(offer.sdp ?? '')
           await pc.setLocalDescription({ type: offer.type, sdp: modifiedSDP })
-          socket.emit(SOCKET_EVENTS.SIGNAL_OFFER, { sdp: pc.localDescription, roomCode: sessionStorage.getItem('roomCode') ?? '' })
+          socket.emit(SOCKET_EVENTS.SIGNAL_OFFER, { offer: pc.localDescription, roomCode: sessionStorage.getItem('roomCode') ?? '' })
         } catch (err) {
           console.error('Negotiation failed:', err)
         }
       }
 
       // ── Receive offer (non-initiator) ──────────────────────────────────────
-      const handleOffer = async (data: { sdp: RTCSessionDescriptionInit }) => {
+      const handleOffer = async (data: { offer: RTCSessionDescriptionInit }) => {
         if (!pcRef.current) return
         try {
-          await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp))
+          await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.offer))
           const answer = await pcRef.current.createAnswer()
           const modifiedSDP = modifySDP(answer.sdp ?? '')
           await pcRef.current.setLocalDescription({ type: answer.type, sdp: modifiedSDP })
-          socket.emit(SOCKET_EVENTS.SIGNAL_ANSWER, { sdp: pcRef.current.localDescription })
+          socket.emit(SOCKET_EVENTS.SIGNAL_ANSWER, { answer: pcRef.current.localDescription, roomCode: sessionStorage.getItem('roomCode') ?? '' })
         } catch (err) {
           console.error('Failed to handle offer:', err)
         }
       }
 
       // ── Receive answer (initiator) ─────────────────────────────────────────
-      const handleAnswer = async (data: { sdp: RTCSessionDescriptionInit }) => {
+      const handleAnswer = async (data: { answer: RTCSessionDescriptionInit }) => {
         if (!pcRef.current) return
         try {
-          await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp))
+          await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.answer))
         } catch (err) {
           console.error('Failed to handle answer:', err)
         }
