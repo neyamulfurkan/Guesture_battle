@@ -180,16 +180,29 @@ export default function BattlePage() {
     }
   }, [])
 
-  // ── WebRTC initiation — called on mount once socket is connected ────────────
+  // ── Rejoin room with new socket ID, then initiate WebRTC ───────────────────
   const hasInitiatedWebRTC = useRef(false)
 
   useEffect(() => {
     if (!socket || !isConnected) return
     if (hasInitiatedWebRTC.current) return
     hasInitiatedWebRTC.current = true
+
+    const storedRoomCode = sessionStorage.getItem('roomCode') ?? roomCode
+    const storedPlayerId = sessionStorage.getItem('playerId') ?? localPlayerId
+    const storedDisplayName = sessionStorage.getItem('displayName') ?? 'Player'
     const isInitiator = sessionStorage.getItem('isInitiator') === 'true'
-    initiate(isInitiator).catch((err: Error) => {
-      addToast(err.message, 'error')
+
+    // Rejoin the socket room so server has our new socket ID
+    socket.emit('join_room', {
+      roomCode: storedRoomCode,
+      playerId: storedPlayerId,
+      displayName: storedDisplayName,
+    }, () => {
+      // After rejoining, initiate WebRTC
+      initiate(isInitiator).catch((err: Error) => {
+        addToast(err.message, 'error')
+      })
     })
   }, [socket, isConnected]) // eslint-disable-line react-hooks/exhaustive-deps
 
