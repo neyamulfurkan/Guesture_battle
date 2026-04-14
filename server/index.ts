@@ -77,39 +77,19 @@ io.on('connection', (socket: Socket) => {
         return
       }
 
-      const added = roomManager.addPlayer(code, socket.id, playerId, displayName)
+      socket.join(code)
+
+      const added = roomManager.addPlayer(code, socket.id, playerId, displayName, io)
       if (!added) {
         callback?.({ error: 'Room is full. Both player slots are already taken.' })
         return
       }
 
-      socket.join(code)
       callback?.({})
 
       const updatedRoom = roomManager.getRoom(code)!
 
-      socket.emit(SOCKET_EVENTS.ROOM_STATE_CHANGE, {
-        state: updatedRoom.state,
-        roomCode: code,
-        localPlayerId: playerId,
-      })
-
       console.log(`Player ${playerId} joined room ${code}, state: ${updatedRoom.state}`)
-
-      if (updatedRoom.state === 'ready') {
-        const otherSocketId = Object.values(updatedRoom.socketIds).find(
-          (sid) => sid !== socket.id
-        ) as string | undefined
-        if (otherSocketId) {
-          io.to(otherSocketId).emit(SOCKET_EVENTS.ROOM_STATE_CHANGE, {
-            state: 'ready',
-            roomCode: code,
-            localPlayerId: updatedRoom.localPlayer.id === playerId
-              ? updatedRoom.remotePlayer.id
-              : updatedRoom.localPlayer.id,
-          })
-        }
-      }
     } catch (err) {
       console.error('JOIN_ROOM error:', err)
       callback?.({ error: 'Server error joining room.' })

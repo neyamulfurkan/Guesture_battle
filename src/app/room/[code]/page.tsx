@@ -122,6 +122,7 @@ if (!isConnected) return
 
         sessionStorage.setItem('roomCode', data.roomCode)
         sessionStorage.setItem('playerId', data.playerId)
+        sessionStorage.setItem('isInitiator', 'true')
 
         await joinRoom({
           roomCode: data.roomCode,
@@ -177,6 +178,7 @@ if (!isConnected) return
 
         sessionStorage.setItem('roomCode', rawCode)
         sessionStorage.setItem('playerId', pid)
+        sessionStorage.setItem('isInitiator', 'false')
 
         await joinRoom({
           roomCode: rawCode,

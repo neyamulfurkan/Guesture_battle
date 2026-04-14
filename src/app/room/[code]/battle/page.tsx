@@ -180,14 +180,27 @@ export default function BattlePage() {
     }
   }, [])
 
-  // ── WebRTC initiation ───────────────────────────────────────────────────────
+  // ── WebRTC initiation — triggered by ROOM_STATE_CHANGE ready ───────────────
+  const hasInitiatedWebRTC = useRef(false)
+
   useEffect(() => {
-    if (!socket || !isConnected) return
-    const isInitiator = sessionStorage.getItem('isInitiator') === 'true'
-    initiate(isInitiator).catch((err: Error) => {
-      addToast(err.message, 'error')
-    })
-  }, [socket, isConnected]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!socket) return
+
+    const handleReadyForWebRTC = (data: { state: string }) => {
+      if (data?.state !== 'ready') return
+      if (hasInitiatedWebRTC.current) return
+      hasInitiatedWebRTC.current = true
+      const isInitiator = sessionStorage.getItem('isInitiator') === 'true'
+      initiate(isInitiator).catch((err: Error) => {
+        addToast(err.message, 'error')
+      })
+    }
+
+    socket.on(SOCKET_EVENTS.ROOM_STATE_CHANGE, handleReadyForWebRTC)
+    return () => {
+      socket.off(SOCKET_EVENTS.ROOM_STATE_CHANGE, handleReadyForWebRTC)
+    }
+  }, [socket, initiate, addToast])
 
   // ── Fallback toast ──────────────────────────────────────────────────────────
   useEffect(() => {
