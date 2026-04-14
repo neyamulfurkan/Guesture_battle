@@ -145,7 +145,7 @@ export default function BattlePage() {
   const { isDetecting, isHandDetected, landmarkData } = useGestureEngine(
     gestureSourceVideoRef,
     onGestureWrapped,
-    !!localStream && battleActive
+    !!localStream
   )
 
   const { isSupported: isSpeechSupported, isListening, lastKeyword } = useSpeechEngine(
@@ -180,27 +180,18 @@ export default function BattlePage() {
     }
   }, [])
 
-  // ── WebRTC initiation — triggered by ROOM_STATE_CHANGE ready ───────────────
+  // ── WebRTC initiation — called on mount once socket is connected ────────────
   const hasInitiatedWebRTC = useRef(false)
 
   useEffect(() => {
-    if (!socket) return
-
-    const handleReadyForWebRTC = (data: { state: string }) => {
-      if (data?.state !== 'ready') return
-      if (hasInitiatedWebRTC.current) return
-      hasInitiatedWebRTC.current = true
-      const isInitiator = sessionStorage.getItem('isInitiator') === 'true'
-      initiate(isInitiator).catch((err: Error) => {
-        addToast(err.message, 'error')
-      })
-    }
-
-    socket.on(SOCKET_EVENTS.ROOM_STATE_CHANGE, handleReadyForWebRTC)
-    return () => {
-      socket.off(SOCKET_EVENTS.ROOM_STATE_CHANGE, handleReadyForWebRTC)
-    }
-  }, [socket, initiate, addToast])
+    if (!socket || !isConnected) return
+    if (hasInitiatedWebRTC.current) return
+    hasInitiatedWebRTC.current = true
+    const isInitiator = sessionStorage.getItem('isInitiator') === 'true'
+    initiate(isInitiator).catch((err: Error) => {
+      addToast(err.message, 'error')
+    })
+  }, [socket, isConnected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Fallback toast ──────────────────────────────────────────────────────────
   useEffect(() => {

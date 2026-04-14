@@ -105,7 +105,9 @@ export default function VideoTile({
     const video = videoRef.current
     if (!video) return
     if (stream) {
-      video.srcObject = stream
+      if (video.srcObject !== stream) {
+        video.srcObject = stream
+      }
       video.play().catch(() => {
         // Autoplay may be blocked; silently ignore
       })
@@ -115,13 +117,12 @@ export default function VideoTile({
         }
       }
       video.addEventListener('loadedmetadata', onLoadedMetadata)
-      // In case metadata already loaded
       if (video.videoWidth > 0) onLoadedMetadata()
       return () => video.removeEventListener('loadedmetadata', onLoadedMetadata)
     } else {
       video.srcObject = null
     }
-  }, [stream])
+  }, [stream, videoRef])
 
   // Prevent iOS scroll on canvas touch
   const handleTouchStart = useCallback((e: TouchEvent) => {
