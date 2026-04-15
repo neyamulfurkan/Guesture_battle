@@ -145,9 +145,12 @@ export default function BattlePage() {
     tryFind()
   }, [localStream])
 
+  const lastConfirmedGestureRef = useRef<{ gestureId: GestureId; palmX: number; palmY: number; time: number } | null>(null)
+
   const onGestureWrapped = useCallback(
     (gesture: GestureId) => {
-      handleGesture(gesture)
+      const palmData = lastConfirmedGestureRef.current
+      handleGesture(gesture, palmData?.palmX, palmData?.palmY)
     },
     [handleGesture]
   )
@@ -168,11 +171,15 @@ export default function BattlePage() {
     [battleActive, handleFaceExpression]
   )
 
-  const { isDetecting, isHandDetected, landmarkData } = useGestureEngine(
+  const { isDetecting, isHandDetected, landmarkData, lastConfirmedGesture } = useGestureEngine(
     gestureSourceVideoRef,
     onGestureWrapped,
     !!localStream
   )
+
+  useEffect(() => {
+    lastConfirmedGestureRef.current = lastConfirmedGesture
+  }, [lastConfirmedGesture])
 
   const { isSupported: isSpeechSupported, isListening, lastKeyword } = useSpeechEngine(
     onKeywordWrapped,
@@ -503,6 +510,7 @@ export default function BattlePage() {
             animationState={animationState}
             landmarkData={landmarkData}
             showSkeleton={settings.showHandSkeleton}
+            lastConfirmedGesture={lastConfirmedGesture}
           />
         </div>
 

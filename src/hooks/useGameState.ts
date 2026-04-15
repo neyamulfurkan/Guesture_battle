@@ -80,7 +80,7 @@ export function useGameState(
   animationState: AnimationState
   localPlayerState: PlayerState | null
   remotePlayerState: PlayerState | null
-  handleGesture: (gesture: GestureId) => void
+  handleGesture: (gesture: GestureId, palmX?: number, palmY?: number) => void
   handleVoiceKeyword: (keyword: VoiceKeyword) => void
   handleFaceExpression: (expression: FaceExpression) => void
   comboState: ComboState
@@ -342,8 +342,32 @@ export function useGameState(
   // ─── HANDLE GESTURE ────────────────────────────────────────────────────────
 
   const handleGesture = useCallback(
-    (gesture: GestureId) => {
+    (gesture: GestureId, palmX?: number, palmY?: number) => {
       const now = Date.now()
+
+      // Write gesture activation overlay onto animationState so canvas can draw it on the hand
+      const mappedPower = GESTURE_TO_POWER_MAP[gesture] ?? null
+      const activation = {
+        gestureId: gesture,
+        powerId: mappedPower,
+        startTime: now,
+        palmX: palmX ?? 0,
+        palmY: palmY ?? 0,
+      }
+      setAnimationState((prev) => ({
+        ...prev,
+        activeGestureActivation: activation,
+      }))
+      // Auto-clear after animation duration (700ms matches drawGestureActivationOnHand duration)
+      setTimeout(() => {
+        setAnimationState((prev) => {
+          if (prev.activeGestureActivation?.startTime === activation.startTime) {
+            return { ...prev, activeGestureActivation: null }
+          }
+          return prev
+        })
+      }, 750)
+
       const currentCombo = comboStateRef.current
 
       // Attempt combo progression first
@@ -363,62 +387,62 @@ export function useGameState(
       if (nextCombo.sequence.length > 1 || nextCombo.target) return
 
       // Single-gesture power mapping (Tier 1)
-      const power = GESTURE_TO_POWER_MAP[gesture]
-      if (!power) return
+      const singlePower = GESTURE_TO_POWER_MAP[gesture]
+      if (!singlePower) return
 
-      const def = POWER_DEFINITIONS[power]
+      const def = POWER_DEFINITIONS[singlePower]
       if (!def) return
 
       // Check if this gesture alone maps to a defend/heal type power
-      if (def.effect === 'shield' || power === 'shield') {
+      if (def.effect === 'shield' || singlePower === 'shield') {
         const room = roomDataRef.current
         if (!room) return
         const localPlayer = room.localPlayer
         const actionTime = Date.now()
-        const { valid } = validateAttack(localPlayer, power, actionTime)
+        const { valid } = validateAttack(localPlayer, singlePower, actionTime)
         if (!valid) return
 
         seqCounterRef.current += 1
         const payload: SocketAttackPayload = {
           roomCode,
           playerId: localPlayerId,
-          power,
+          power: singlePower,
           sequenceNumber: seqCounterRef.current,
           timestamp: actionTime,
         }
         socket?.emit(SOCKET_EVENTS.GAME_EVENT, payload)
         // Optimistically update cooldown
-        const updatedRoom = { ...room, localPlayer: { ...room.localPlayer, cooldowns: { ...room.localPlayer.cooldowns, [power]: actionTime } } }
+        const updatedRoom = { ...room, localPlayer: { ...room.localPlayer, cooldowns: { ...room.localPlayer.cooldowns, [singlePower]: actionTime } } }
         roomDataRef.current = updatedRoom
         setRoomData(updatedRoom)
         return
       }
 
-      if (power === 'heal') {
+      if (singlePower === 'heal') {
         const room = roomDataRef.current
         if (!room) return
         const localPlayer = room.localPlayer
         const actionTime = Date.now()
-        const { valid } = validateAttack(localPlayer, power, actionTime)
+        const { valid } = validateAttack(localPlayer, singlePower, actionTime)
         if (!valid) return
 
         seqCounterRef.current += 1
         const payload: SocketAttackPayload = {
           roomCode,
           playerId: localPlayerId,
-          power,
+          power: singlePower,
           sequenceNumber: seqCounterRef.current,
           timestamp: actionTime,
         }
         socket?.emit(SOCKET_EVENTS.GAME_EVENT, payload)
         // Optimistically update cooldown
-        const updatedRoom = { ...room, localPlayer: { ...room.localPlayer, cooldowns: { ...room.localPlayer.cooldowns, [power]: actionTime } } }
+        const updatedRoom = { ...room, localPlayer: { ...room.localPlayer, cooldowns: { ...room.localPlayer.cooldowns, [singlePower]: actionTime } } }
         roomDataRef.current = updatedRoom
         setRoomData(updatedRoom)
         return
       }
 
-      emitAttack(power)
+      emitAttack(singlePower)
     },
     [emitAttack, roomCode, localPlayerId, socket]
   )
