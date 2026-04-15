@@ -54,20 +54,22 @@ interface PlayerResultProps {
 }
 
 export function PlayerResult({ playerState, isWinner, xpEarned, stream }: PlayerResultProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const winnerVideoRef = useRef<HTMLVideoElement>(null)
+  const loserVideoRef = useRef<HTMLVideoElement>(null)
   const [mounted, setMounted] = useState(false)
 
-  const encouragingMessage = ENCOURAGING_MESSAGES[hashId(playerState.id) % ENCOURAGING_MESSAGES.length]
+  const encouragingMessage = ENCOURAGING_MESSAGES[hashId(playerState?.id ?? playerState.displayName ?? 'fallback') % ENCOURAGING_MESSAGES.length]
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream
+    const ref = isWinner ? winnerVideoRef.current : loserVideoRef.current
+    if (ref && stream) {
+      ref.srcObject = stream
     }
-  }, [stream])
+  }, [stream, isWinner])
 
   if (isWinner) {
     return (
@@ -109,7 +111,7 @@ export function PlayerResult({ playerState, isWinner, xpEarned, stream }: Player
             }}
           >
             <video
-              ref={videoRef}
+              ref={winnerVideoRef}
               autoPlay
               playsInline
               muted
@@ -195,7 +197,7 @@ export function PlayerResult({ playerState, isWinner, xpEarned, stream }: Player
           }}
         >
           <video
-            ref={videoRef}
+            ref={loserVideoRef}
             autoPlay
             playsInline
             muted
