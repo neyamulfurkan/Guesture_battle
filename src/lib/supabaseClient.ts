@@ -7,7 +7,12 @@ export const supabase: SupabaseClient = createClient(
 
 // WARNING: supabaseAdmin uses the service role key. Never import this in client-side code.
 // Only import in src/app/api/** route handlers.
-export const supabaseAdmin: SupabaseClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export function getSupabaseAdmin(): SupabaseClient {
+  if (typeof window !== 'undefined') {
+    throw new Error('supabaseAdmin must not be used on the client side.')
+  }
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}

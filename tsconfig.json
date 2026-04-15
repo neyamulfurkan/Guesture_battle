@@ -23,6 +23,7 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "allowJs": true,
+    "allowArbitraryExtensions": true,
     "plugins": [
       {
         "name": "next"

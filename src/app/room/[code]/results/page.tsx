@@ -64,15 +64,15 @@ export default function ResultsPage() {
       const isWinner = result.winnerId === result.localPlayerId
 
       if (isWinner) {
-        await supabase.rpc('increment_win', { user_id: session.user.id })
+        await supabase.rpc('increment_win', { user_uuid: session.user.id })
       } else {
-        await supabase.rpc('increment_loss', { user_id: session.user.id })
+        await supabase.rpc('increment_loss', { user_uuid: session.user.id })
       }
 
       if (result.newlyUnlockedPower) {
         await supabase.rpc('unlock_power', {
-          user_id: session.user.id,
-          power_id: result.newlyUnlockedPower,
+          user_uuid: session.user.id,
+          power_name: result.newlyUnlockedPower,
         })
       }
     }
