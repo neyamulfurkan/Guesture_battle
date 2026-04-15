@@ -800,10 +800,11 @@ export function drawGestureActivationOnHand(
   if (t >= 1) { ctx.restore(); return }
 
   const fadeOut = t > 0.6 ? 1 - (t - 0.6) / 0.4 : 1
-  const scaleIn = t < 0.2 ? t / 0.2 : 1
+  const scaleIn = t < 0.2 ? Math.max(t / 0.2, 0.1) : 1
 
   ctx.translate(palmX, palmY)
   ctx.scale(scaleIn, scaleIn)
+  ctx.globalAlpha = fadeOut * scaleIn
 
   // Color and label per power/gesture
   let color = '#3b82f6'
@@ -882,16 +883,16 @@ export function drawGestureActivationOnHand(
   ctx.arc(0, 0, ringRadius, 0, Math.PI * 2)
   ctx.strokeStyle = color
   ctx.lineWidth = 2.5
-  ctx.globalAlpha = fadeOut * 0.8
+  ctx.globalAlpha = fadeOut * 0.8 * scaleIn
   ctx.shadowColor = color
-  ctx.shadowBlur = 18
+  ctx.shadowBlur = Math.min(18 * scaleIn, 18)
   ctx.stroke()
 
   // Inner filled circle
   ctx.beginPath()
   ctx.arc(0, 0, 28, 0, Math.PI * 2)
   ctx.fillStyle = color
-  ctx.globalAlpha = fadeOut * 0.18
+  ctx.globalAlpha = fadeOut * 0.18 * scaleIn
   ctx.fill()
 
   // Rotating arc segments
@@ -903,14 +904,14 @@ export function drawGestureActivationOnHand(
     ctx.arc(0, 0, ringRadius + 8, startAngle, endAngle)
     ctx.strokeStyle = color
     ctx.lineWidth = 3
-    ctx.globalAlpha = fadeOut * 0.6
-    ctx.shadowBlur = 12
+    ctx.globalAlpha = fadeOut * 0.6 * scaleIn
+    ctx.shadowBlur = Math.min(12 * scaleIn, 12)
     ctx.stroke()
   }
 
   // Symbol text
-  ctx.globalAlpha = fadeOut
-  ctx.shadowBlur = 10
+  ctx.globalAlpha = fadeOut * scaleIn
+  ctx.shadowBlur = Math.min(10 * scaleIn, 10)
   ctx.shadowColor = color
   ctx.font = 'bold 16px sans-serif'
   ctx.textAlign = 'center'
@@ -922,8 +923,8 @@ export function drawGestureActivationOnHand(
   const pillY = -ringRadius - 22
   const pillW = label.length * 7 + 16
   const pillH = 20
-  ctx.globalAlpha = fadeOut * 0.92
-  ctx.shadowBlur = 14
+  ctx.globalAlpha = fadeOut * 0.92 * scaleIn
+  ctx.shadowBlur = Math.min(14 * scaleIn, 14)
   ctx.shadowColor = color
 
   // Pill background
