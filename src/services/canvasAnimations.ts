@@ -117,6 +117,7 @@ export function drawFireballImpact(
   ctx: CanvasRenderingContext2D,
   impact: Impact,
   canvasWidth: number,
+  canvasHeight: number,
   now: number
 ): void {
   ctx.save()
@@ -125,10 +126,10 @@ export function drawFireballImpact(
   const t = clamp(elapsed / 400, 0, 1)
   if (t >= 1) { ctx.restore(); return }
 
-const x = impact.side === 'local' ? canvasWidth * 0.25 : canvasWidth * 0.75
-  const y = canvasWidth > 400 ? canvasWidth * 0.3 : 150
+  const x = canvasWidth * 0.5
+  const y = canvasHeight * 0.4
   const opacity = 1 - t
- const burstRadius = lerp(0, 80, easeOutCubic(t))
+  const burstRadius = lerp(0, 80, easeOutCubic(t))
   ctx.save()
   ctx.shadowColor = '#f97316'
   ctx.shadowBlur = 30
@@ -217,6 +218,7 @@ export function drawZapImpact(
   ctx: CanvasRenderingContext2D,
   impact: Impact,
   canvasWidth: number,
+  canvasHeight: number,
   now: number
 ): void {
   ctx.save()
@@ -225,8 +227,8 @@ export function drawZapImpact(
   const t = clamp(elapsed / 200, 0, 1)
   if (t >= 1) { ctx.restore(); return }
 
-  const x = impact.side === 'local' ? canvasWidth * 0.25 : canvasWidth * 0.75
-  const y = 200
+  const x = canvasWidth * 0.5
+  const y = canvasHeight * 0.4
   const opacity = 1 - t
 
   ctx.shadowColor = '#facc15'
@@ -621,6 +623,7 @@ export function drawDragonImpact(
   ctx: CanvasRenderingContext2D,
   impact: Impact,
   canvasWidth: number,
+  canvasHeight: number,
   now: number
 ): void {
   ctx.save()
@@ -629,8 +632,8 @@ export function drawDragonImpact(
   const t = clamp(elapsed / 600, 0, 1)
   if (t >= 1) { ctx.restore(); return }
 
-  const x = impact.side === 'local' ? canvasWidth * 0.25 : canvasWidth * 0.75
-  const y = canvasWidth > 400 ? canvasWidth * 0.3 : 150
+  const x = canvasWidth * 0.5
+  const y = canvasHeight * 0.4
   const opacity = 1 - t
 
   // Expanding burst

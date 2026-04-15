@@ -325,14 +325,14 @@ export function useGameState(
           }, getProjectileDuration(event.power as PowerId))
           // Floating damage text on defender tile
           setTimeout(() => {
-            addFloatingText(`-${event.damage} HP`, defenderSide, 300, 200)
+            addFloatingText(`-${event.damage} HP`, defenderSide, 400, 300)
           }, getProjectileDuration(event.power as PowerId))
         }
       }
 
       if (event.type === 'heal' && event.healAmount && event.healAmount > 0) {
-        addImpact('heal' as PowerId, attackerSide)
-        addFloatingText(`+${event.healAmount} HP`, attackerSide, 300, 200)
+addImpact('heal' as PowerId, attackerSide)
+      addFloatingText(`+${event.healAmount} HP`, attackerSide, 400, 300)
       }
 
       setRoomData((prev) => {

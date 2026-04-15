@@ -177,9 +177,10 @@ const dpr = window.devicePixelRatio || 1
 
     // ── Impacts ─────────────────────────────────────────────────────────────
     for (const impact of state.activeImpacts) {
+      if (impact.side !== playerSide) continue
       switch (impact.type) {
         case 'fire_punch':
-          drawFireballImpact(ctx, impact, displayWidth, now)
+          drawFireballImpact(ctx, impact, displayWidth, displayHeight, now)
           if (perf !== 'minimal') {
             particleSystemRef.current.emit('fire', displayWidth * 0.5, displayHeight * 0.4, 4)
             particleSystemRef.current.emit('spark', displayWidth * 0.5, displayHeight * 0.4, 3)
@@ -187,13 +188,13 @@ const dpr = window.devicePixelRatio || 1
           break
         case 'zap_shot':
         case 'thunder_smash':
-          drawZapImpact(ctx, impact, displayWidth, now)
+          drawZapImpact(ctx, impact, displayWidth, displayHeight, now)
           if (perf !== 'minimal') {
             particleSystemRef.current.emit('lightning', displayWidth * 0.5, displayHeight * 0.4, 3)
           }
           break
         case 'dragon_blast':
-          drawDragonImpact(ctx, impact, displayWidth, now)
+          drawDragonImpact(ctx, impact, displayWidth, displayHeight, now)
           if (perf === 'full') {
             particleSystemRef.current.emit('fire', displayWidth * 0.5, displayHeight * 0.4, 6)
             particleSystemRef.current.emit('spark', displayWidth * 0.5, displayHeight * 0.4, 4)
