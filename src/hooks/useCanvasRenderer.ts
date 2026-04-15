@@ -258,10 +258,13 @@ export function useCanvasRenderer(
     // ── Gesture activation on hand ──────────────────────────────────────────
     const activation = state.activeGestureActivation
     if (activation && playerSide === 'local') {
+      // palmX/palmY are normalized 0-1 from MediaPipe — convert to canvas pixel coords
+      const pixelPalmX = activation.palmX * displayWidth
+      const pixelPalmY = activation.palmY * displayHeight
       drawGestureActivationOnHand(
         ctx,
-        activation.palmX,
-        activation.palmY,
+        pixelPalmX,
+        pixelPalmY,
         activation.powerId,
         activation.gestureId,
         activation.startTime,
