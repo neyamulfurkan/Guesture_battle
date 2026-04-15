@@ -8,6 +8,7 @@ import {
   COMBO_PERFORMANCE_EXTENSION_MS,
   ATTACK_PROJECTILE_DURATION_FIREBALL,
   ATTACK_PROJECTILE_DURATION_ZAP,
+  ATTACK_FLOAT_TEXT_DURATION,
 } from '@/lib/gameConstants'
 import { SOCKET_EVENTS, POWER_DEFINITIONS } from '@/lib/gameConstants.server'
 import {
@@ -196,6 +197,47 @@ export function useGameState(
     }, projectile.duration + 100)
   }, [])
 
+  const addImpact = useCallback((power: PowerId, targetSide: PlayerSide) => {
+    const impact = {
+      id: generateId(),
+      type: power,
+      side: targetSide,
+      startTime: Date.now(),
+    }
+    setAnimationState((prev) => ({
+      ...prev,
+      activeImpacts: [...prev.activeImpacts, impact],
+    }))
+    setTimeout(() => {
+      setAnimationState((prev) => ({
+        ...prev,
+        activeImpacts: prev.activeImpacts.filter((imp) => imp.id !== impact.id),
+      }))
+    }, 700)
+  }, [])
+
+  const addFloatingText = useCallback((text: string, targetSide: PlayerSide, canvasWidth: number, canvasHeight: number) => {
+    const ft = {
+      id: generateId(),
+      text,
+      side: targetSide,
+      x: canvasWidth * 0.5,
+      y: canvasHeight * 0.4,
+      opacity: 1,
+      startTime: Date.now(),
+    }
+    setAnimationState((prev) => ({
+      ...prev,
+      floatingTexts: [...prev.floatingTexts, ft],
+    }))
+    setTimeout(() => {
+      setAnimationState((prev) => ({
+        ...prev,
+        floatingTexts: prev.floatingTexts.filter((f) => f.id !== ft.id),
+      }))
+    }, ATTACK_FLOAT_TEXT_DURATION + 100)
+  }, [])
+
   const triggerShake = useCallback((side: PlayerSide, amplitude: number) => {
     setAnimationState((prev) => ({
       ...prev,
@@ -239,6 +281,39 @@ export function useGameState(
       lastSeqRef.current = serverSeq
       setSequenceNumber(serverSeq)
 
+      // Determine sides based on attacker/target ids
+      const attackerIsLocal = event.attackerId === localPlayerId
+      const defenderIsLocal = event.targetId === localPlayerId
+      const attackerSide: PlayerSide = attackerIsLocal ? 'local' : 'remote'
+      const defenderSide: PlayerSide = defenderIsLocal ? 'local' : 'remote'
+
+      // Trigger attack animations for BOTH local and remote attacks on server confirmation
+      if (event.type === 'attack' && event.power) {
+        // Only add projectile for remote attacker — local attacker already got optimistic projectile
+        if (!attackerIsLocal) {
+          addProjectile(event.power, attackerSide)
+        }
+        // Impact always shown on defender tile for all attacks (server confirmed)
+        setTimeout(() => {
+          addImpact(event.power as PowerId, defenderSide)
+        }, getProjectileDuration(event.power as PowerId))
+        // Shake defender
+        if (event.damage && event.damage > 0) {
+          setTimeout(() => {
+            triggerShake(defenderSide, 6)
+          }, getProjectileDuration(event.power as PowerId))
+          // Floating damage text on defender tile
+          setTimeout(() => {
+            addFloatingText(`-${event.damage} HP`, defenderSide, 300, 200)
+          }, getProjectileDuration(event.power as PowerId))
+        }
+      }
+
+      if (event.type === 'heal' && event.healAmount && event.healAmount > 0) {
+        addImpact('heal' as PowerId, attackerSide)
+        addFloatingText(`+${event.healAmount} HP`, attackerSide, 300, 200)
+      }
+
       setRoomData((prev) => {
         if (!prev) return prev
         const updatedRoom = applyGameEvent(prev, event)
@@ -262,12 +337,6 @@ export function useGameState(
           triggerCorrectionFlash(remoteSide)
         }
 
-        // Trigger shake on defender on attack events
-        if (event.type === 'attack' && event.damage && event.damage > 0) {
-          const defenderIsLocal = event.targetId === localPlayerId
-          triggerShake(defenderIsLocal ? 'local' : 'remote', 6)
-        }
-
         return {
           ...updatedRoom,
           localPlayer: reconciledLocal,
@@ -275,7 +344,7 @@ export function useGameState(
         }
       })
     },
-    [localPlayerId, triggerCorrectionFlash, triggerShake]
+    [localPlayerId, triggerCorrectionFlash, triggerShake, addProjectile, addImpact, addFloatingText]
   )
 
   // ─── SOCKET SUBSCRIPTIONS ──────────────────────────────────────────────────
