@@ -3,7 +3,7 @@ import { createServer } from 'http'
 import { Server, Socket } from 'socket.io'
 import { roomManager, RoomManager } from './roomManager'
 import { GameEngine } from './gameEngine'
-import { SOCKET_EVENTS, SERVER_RATE_LIMIT_ATTACK_MS } from '../src/lib/gameConstants.server'
+import { SOCKET_EVENTS, SERVER_RATE_LIMIT_ATTACK_MS, POWER_DEFINITIONS } from '../src/lib/gameConstants.server'
 import type { SocketRoomJoinPayload, SocketAttackPayload, GameEvent } from '../src/types/game'
 
 const app = express()
@@ -179,14 +179,20 @@ io.on('connection', (socket: Socket) => {
       // Record timestamp here using server time so both checks use the same clock
       room.lastAttackTimestamp[playerId] = serverNow
 
+      const powerDef = POWER_DEFINITIONS[power]
+      const isHeal = powerDef?.healAmount !== undefined && (powerDef.damage === undefined || powerDef.damage === 0)
+      const isDefend = power === 'shield' || power === 'reflect_dome'
+      const eventType: GameEvent['type'] = isHeal ? 'heal' : isDefend ? 'defend' : 'attack'
       const gameEvent: GameEvent = {
-        type: 'attack',
+        type: eventType,
         power,
         attackerId: playerId,
         targetId:
           room.localPlayer.id === playerId
             ? room.remotePlayer.id
             : room.localPlayer.id,
+        damage: powerDef?.damage ?? 0,
+        healAmount: powerDef?.healAmount ?? 0,
         sequenceNumber,
         timestamp: serverNow,
       }

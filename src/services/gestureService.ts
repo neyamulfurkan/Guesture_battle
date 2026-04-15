@@ -286,7 +286,7 @@ export class GestureEngine {
     const palmCenter = px(9) // landmark 9 is middle finger MCP, good palm center proxy
 
     // ─── FIST ──────────────────────────────────────────────────────
-    const fistThreshold = 30
+    const fistThreshold = 50
     const allCurled =
       distancePx(indexTip.x, indexTip.y, palmCenter.x, palmCenter.y) < fistThreshold &&
       distancePx(middleTip.x, middleTip.y, palmCenter.x, palmCenter.y) < fistThreshold &&
@@ -305,7 +305,7 @@ export class GestureEngine {
       distancePx(ringTip.x, ringTip.y, ringMcp.x, ringMcp.y) > extendThreshold &&
       distancePx(pinkyTip.x, pinkyTip.y, pinkyMcp.x, pinkyMcp.y) > extendThreshold
 
-    if (allExtended && landmarks[9].z < -0.05) return 'open_palm'
+    if (allExtended) return 'open_palm'
 
     // ─── INDEX POINT ───────────────────────────────────────────────
     const indexExtended =

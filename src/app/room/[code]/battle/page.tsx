@@ -147,10 +147,9 @@ export default function BattlePage() {
 
   const onGestureWrapped = useCallback(
     (gesture: GestureId) => {
-      if (!battleActive) return
       handleGesture(gesture)
     },
-    [battleActive, handleGesture]
+    [handleGesture]
   )
 
   const onKeywordWrapped = useCallback(
@@ -233,6 +232,8 @@ export default function BattlePage() {
       initiate(isInitiator).catch((err: Error) => {
         addToast(err.message, 'error')
       })
+      // Signal server that this peer is ready so battle state transition fires
+      socket.emit('peer_ready', { roomCode: storedRoomCode })
     })
 
     // Fallback: if ROOM_STATE_CHANGE fired before our listener registered, start countdown
