@@ -125,11 +125,10 @@ export function drawFireballImpact(
   const t = clamp(elapsed / 400, 0, 1)
   if (t >= 1) { ctx.restore(); return }
 
-  const x = impact.side === 'local' ? canvasWidth * 0.25 : canvasWidth * 0.75
-  const y = 200
-  const burstRadius = lerp(0, 80, easeOutCubic(t))
+const x = impact.side === 'local' ? canvasWidth * 0.25 : canvasWidth * 0.75
+  const y = canvasWidth > 400 ? canvasWidth * 0.3 : 150
   const opacity = 1 - t
-
+ const burstRadius = lerp(0, 80, easeOutCubic(t))
   ctx.save()
   ctx.shadowColor = '#f97316'
   ctx.shadowBlur = 30
@@ -631,7 +630,7 @@ export function drawDragonImpact(
   if (t >= 1) { ctx.restore(); return }
 
   const x = impact.side === 'local' ? canvasWidth * 0.25 : canvasWidth * 0.75
-  const y = 200
+  const y = canvasWidth > 400 ? canvasWidth * 0.3 : 150
   const opacity = 1 - t
 
   // Expanding burst
@@ -644,9 +643,12 @@ export function drawDragonImpact(
   ctx.shadowBlur = 30
   ctx.stroke()
 
-  // Orange burn overlay
-  ctx.fillStyle = `rgba(249,115,22,${0.25 * opacity})`
-  ctx.fillRect(0, 0, canvasWidth, 400)
+  // Orange burn overlay — clipped to impact area only
+  const overlayRadius = lerp(0, 120, easeOutCubic(t))
+  ctx.beginPath()
+  ctx.arc(x, y, overlayRadius, 0, Math.PI * 2)
+  ctx.fillStyle = `rgba(249,115,22,${0.18 * opacity})`
+  ctx.fill()
 
   // 40 gravity particles
   for (let i = 0; i < 40; i++) {

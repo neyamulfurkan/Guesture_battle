@@ -118,11 +118,11 @@ export function useCanvasRenderer(
     lastTimeRef.current = now
     recordFrameTime(deltaTime)
 
-    const dpr = window.devicePixelRatio || 1
-    const displayWidth = canvas.width / dpr
-    const displayHeight = canvas.height / dpr
+const dpr = window.devicePixelRatio || 1
+    const displayWidth = canvas.offsetWidth
+    const displayHeight = canvas.offsetHeight
 
-    // Clear frame
+    // Clear frame — use logical (CSS) pixel dimensions, not physical
     ctx.clearRect(0, 0, displayWidth, displayHeight)
 
     const state = animStateRef.current
