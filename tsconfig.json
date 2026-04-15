@@ -23,7 +23,6 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "allowJs": true,
-    "allowArbitraryExtensions": true,
     "plugins": [
       {
         "name": "next"
@@ -34,7 +33,8 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "src/types/**/*.d.ts"
   ],
   "exclude": [
     "node_modules"
