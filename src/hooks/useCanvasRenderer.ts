@@ -257,8 +257,9 @@ const dpr = window.devicePixelRatio || 1
 
     // ── Gesture activation on hand ──────────────────────────────────────────
     const activation = state.activeGestureActivation
-    if (activation && playerSide === 'local') {
-      // palmX/palmY are normalized 0-1 from MediaPipe — convert to canvas pixel coords
+    if (activation && activation.side === playerSide) {
+      // palmX/palmY are normalized 0-1 — convert to canvas pixel coords
+      // For remote tile, center the overlay (0.5, 0.5) since we have no hand landmarks
       const pixelPalmX = activation.palmX * displayWidth
       const pixelPalmY = activation.palmY * displayHeight
       drawGestureActivationOnHand(

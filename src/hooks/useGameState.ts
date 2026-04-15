@@ -289,9 +289,30 @@ export function useGameState(
 
       // Trigger attack animations for BOTH local and remote attacks on server confirmation
       if (event.type === 'attack' && event.power) {
-        // Only add projectile for remote attacker — local attacker already got optimistic projectile
+        // For remote attacker: add projectile AND gesture activation overlay on remote tile
         if (!attackerIsLocal) {
           addProjectile(event.power, attackerSide)
+          // Show gesture activation effect on remote player's tile
+          const remoteActivation = {
+            gestureId: (POWER_DEFINITIONS[event.power as PowerId]?.gestureId ?? 'fist') as GestureId,
+            powerId: event.power as PowerId,
+            startTime: Date.now(),
+            palmX: 0.5,
+            palmY: 0.5,
+            side: 'remote' as PlayerSide,
+          }
+          setAnimationState((prev) => ({
+            ...prev,
+            activeGestureActivation: remoteActivation,
+          }))
+          setTimeout(() => {
+            setAnimationState((prev) => {
+              if (prev.activeGestureActivation?.startTime === remoteActivation.startTime) {
+                return { ...prev, activeGestureActivation: null }
+              }
+              return prev
+            })
+          }, 750)
         }
         // Impact always shown on defender tile for all attacks (server confirmed)
         setTimeout(() => {
@@ -422,6 +443,7 @@ export function useGameState(
         startTime: now,
         palmX: palmX ?? 0,
         palmY: palmY ?? 0,
+        side: 'local' as PlayerSide,
       }
       setAnimationState((prev) => ({
         ...prev,

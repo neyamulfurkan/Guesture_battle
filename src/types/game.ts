@@ -151,6 +151,7 @@ export interface GestureActivation {
   startTime: number
   palmX: number
   palmY: number
+  side: PlayerSide
 }
 
 export interface AnimationState {
