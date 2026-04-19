@@ -201,8 +201,9 @@ io.on('connection', (socket: Socket) => {
         return
       }
 
-      // Record timestamp here using server time so both checks use the same clock
-      room.lastAttackTimestamp[playerId] = serverNow
+      // NOTE: Do NOT set lastAttackTimestamp here. gameEngine.processGameEvent sets it
+      // authoritatively using server time after validation passes. Setting it here first
+      // causes processGameEvent's rate limit check to see elapsed=0 and drop every attack.
 
       const powerDef = POWER_DEFINITIONS[power]
       const isHeal = powerDef?.healAmount !== undefined && (powerDef.damage === undefined || powerDef.damage === 0)

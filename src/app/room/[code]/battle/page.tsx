@@ -262,13 +262,8 @@ export default function BattlePage() {
       addToast(err.message, 'error')
     })
 
-    // Fallback: if ROOM_STATE_CHANGE fired before our listener registered, start countdown
-    const fallbackTimer = setTimeout(() => {
-      startCountdown()
-    }, 1200)
-
     return () => {
-      clearTimeout(fallbackTimer)
+      // No fallback countdown — battle start is always driven by server ROOM_STATE_CHANGE
     }
   }, [socket, isConnected]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -391,7 +386,7 @@ export default function BattlePage() {
     }
 
     const handleRoomStateChange = (data: { state: string; localPlayerId?: string }) => {
-      if (data?.state === 'battle' || data?.state === 'ready') {
+      if (data?.state === 'battle') {
         startCountdown()
       }
     }

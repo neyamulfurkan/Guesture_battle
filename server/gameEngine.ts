@@ -65,7 +65,7 @@ export class GameEngine {
         return
       }
 
-      // Record rate-limit timestamp using server time
+      // Record rate-limit timestamp authoritatively — only set here, never in index.ts before this call
       room.lastAttackTimestamp[event.attackerId] = serverNow
       // Overwrite client timestamp with server time so cooldown storage is authoritative
       event.timestamp = serverNow

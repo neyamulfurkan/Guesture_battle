@@ -160,8 +160,12 @@ export class RoomManager {
     // Replace socket ID
     room.socketIds[side] = newSocketId
 
-    // Clear stale peersReady socket IDs — new peer_ready signals needed from new socket IDs
-    room.peersReady.clear()
+    // Only clear peersReady if this was a true mid-battle socket reconnect (had a disconnect timer).
+    // On normal battle-page navigation, both players call rejoinPlayer in sequence — clearing here
+    // would wipe the first player's peer_ready signal before the second player sends theirs.
+    if (hadDisconnectTimer) {
+      room.peersReady.clear()
+    }
 
     const opponentSide: PlayerSide = side === 'local' ? 'remote' : 'local'
     const opponentSocketId = room.socketIds[opponentSide]
