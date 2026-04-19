@@ -98,6 +98,8 @@ io.on('connection', (socket: Socket) => {
         return
       }
 
+      // Reset per-player sequence number so a fresh battle page always starts clean
+      gameEngine.resetPlayerSequence(playerId)
       callback?.({})
 
       const updatedRoom = roomManager.getRoom(code)!
@@ -169,6 +171,19 @@ io.on('connection', (socket: Socket) => {
 
       const { playerId, power, sequenceNumber } = payload
       const serverNow = Date.now()
+
+      // Guard: only process game events when room is in battle state
+      if (room.state !== 'battle') {
+        console.log(`GAME_EVENT dropped: room ${code} state is '${room.state}', not 'battle'. playerId=${playerId} power=${power}`)
+        return
+      }
+
+      // Guard: player must be registered in this room
+      if (!roomManager.isPlayerInRoom(code, playerId)) {
+        console.log(`GAME_EVENT dropped: playerId=${playerId} not found in room ${code}`)
+        socket.emit(SOCKET_EVENTS.ERROR, { message: 'You are not registered in this room. Please rejoin.' })
+        return
+      }
 
       const lastAttack = room.lastAttackTimestamp[playerId] ?? 0
       if (serverNow - lastAttack < SERVER_RATE_LIMIT_ATTACK_MS) {

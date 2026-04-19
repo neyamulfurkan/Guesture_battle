@@ -93,6 +93,10 @@ export class GameEngine {
 
   // ── endGame ────────────────────────────────────────────────────────────────
 
+  resetPlayerSequence(playerId: string): void {
+    this.playerSequenceNumbers.delete(playerId)
+  }
+
   endGame(room: ServerRoom, winnerId: string, io: Server): void {
     room.state = 'ended'
     room.endedAt = Date.now()

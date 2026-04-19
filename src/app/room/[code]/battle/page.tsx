@@ -41,8 +41,10 @@ const DEFAULT_SETTINGS: GameSettings = {
 }
 
 function generateLocalPlayerId(): string {
+  // Always read from sessionStorage first so the ID is consistent across
+  // the room page join and the battle page attack emissions
   const stored = sessionStorage.getItem('playerId')
-  if (stored) return stored
+  if (stored && stored.length > 0) return stored
   const id = Math.random().toString(36).slice(2, 11)
   sessionStorage.setItem('playerId', id)
   return id
@@ -174,7 +176,7 @@ export default function BattlePage() {
   const { isDetecting, isHandDetected, landmarkData, lastConfirmedGesture } = useGestureEngine(
     gestureSourceVideoRef,
     onGestureWrapped,
-    !!localStream
+    !!localStream && battleActive
   )
 
   useEffect(() => {
@@ -222,14 +224,18 @@ export default function BattlePage() {
     hasInitiatedWebRTC.current = true
 
     const storedRoomCode = sessionStorage.getItem('roomCode') ?? roomCode
-    const storedPlayerId = sessionStorage.getItem('playerId') ?? localPlayerId
+    // Use localPlayerId (from useRef/generateLocalPlayerId) as the single source of truth.
+    // This is the same ID passed to useGameState and used in all attack emissions.
     const storedDisplayName = sessionStorage.getItem('displayName') ?? 'Player'
     const isInitiator = sessionStorage.getItem('isInitiator') === 'true'
+
+    // Ensure sessionStorage is in sync with the ID we will use for attacks
+    sessionStorage.setItem('playerId', localPlayerId)
 
     // Rejoin the socket room so server has our new socket ID
     socket.emit('join_room', {
       roomCode: storedRoomCode,
-      playerId: storedPlayerId,
+      playerId: localPlayerId,
       displayName: storedDisplayName,
     }, (res?: { error?: string }) => {
       if (res?.error) {
