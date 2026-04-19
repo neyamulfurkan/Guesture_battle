@@ -331,16 +331,25 @@ export class GestureEngine {
     if (allExtended) return 'open_palm'
 
     // ─── INDEX POINT ───────────────────────────────────────────────
+    // Require middle, ring, pinky ALL curled tightly — use a stricter curl threshold
+    // (fistThreshold - 10 = 30px) so that fingers that are merely partially extended
+    // during an open-palm gesture do not accidentally pass as curled.
     const indexExtended =
       distancePx(indexTip.x, indexTip.y, indexMcp.x, indexMcp.y) > extendThreshold
     const middleCurled =
-      distancePx(middleTip.x, middleTip.y, middleMcp.x, middleMcp.y) < fistThreshold
+      distancePx(middleTip.x, middleTip.y, middleMcp.x, middleMcp.y) < fistThreshold - 10
     const ringCurled =
-      distancePx(ringTip.x, ringTip.y, ringMcp.x, ringMcp.y) < fistThreshold
+      distancePx(ringTip.x, ringTip.y, ringMcp.x, ringMcp.y) < fistThreshold - 10
     const pinkyCurled =
-      distancePx(pinkyTip.x, pinkyTip.y, pinkyMcp.x, pinkyMcp.y) < fistThreshold
+      distancePx(pinkyTip.x, pinkyTip.y, pinkyMcp.x, pinkyMcp.y) < fistThreshold - 10
 
-    if (indexExtended && middleCurled && ringCurled && pinkyCurled) return 'index_point'
+    // Additional guard: middle finger must be significantly less extended than index.
+    // If middle is nearly as extended as index, this is open_palm not index_point.
+    const middleNotExtended =
+      distancePx(middleTip.x, middleTip.y, middleMcp.x, middleMcp.y) 
+      distancePx(indexTip.x, indexTip.y, indexMcp.x, indexMcp.y) * 0.5
+
+    if (indexExtended && middleCurled && ringCurled && pinkyCurled && middleNotExtended) return 'index_point'
 
     // ─── PEACE SIGN ────────────────────────────────────────────────
     const middleExtended =
