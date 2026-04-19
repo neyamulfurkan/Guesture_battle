@@ -51,6 +51,7 @@ const POWER_COOLDOWNS: Record<PowerId, number> = {
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 function clampHp(hp: number): number {
+  // SERVER_MAX_HP is imported from gameConstants — clamp uses the same value
   return Math.max(0, Math.min(SERVER_MAX_HP, hp))
 }
 

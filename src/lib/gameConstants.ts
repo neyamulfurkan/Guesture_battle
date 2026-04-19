@@ -94,7 +94,7 @@ export const VOICE_SFX_TRIGGER_LENGTH_MS = 300
 
 // ─── SERVER ───────────────────────────────────────────────────────────────────
 export const SERVER_RATE_LIMIT_ATTACK_MS = 800
-export const SERVER_MAX_HP = 100
+export const SERVER_MAX_HP = 300
 export const SERVER_WAR_CRY_DAMAGE_BONUS = 0.1
 export const SERVER_FOCUS_COMBO_EXTENSION_MS = 300
 
