@@ -54,11 +54,12 @@ interface PlayerResultProps {
 }
 
 export function PlayerResult({ playerState, isWinner, xpEarned, stream }: PlayerResultProps) {
+  if (!playerState) return null
   const winnerVideoRef = useRef<HTMLVideoElement>(null)
   const loserVideoRef = useRef<HTMLVideoElement>(null)
   const [mounted, setMounted] = useState(false)
 
-  const encouragingMessage = ENCOURAGING_MESSAGES[hashId(playerState?.id ?? playerState.displayName ?? 'fallback') % ENCOURAGING_MESSAGES.length]
+  const encouragingMessage = ENCOURAGING_MESSAGES[hashId(playerState?.id ?? playerState?.displayName ?? 'fallback') % ENCOURAGING_MESSAGES.length]
 
   useEffect(() => {
     setMounted(true)

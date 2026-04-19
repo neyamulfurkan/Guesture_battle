@@ -14,13 +14,17 @@ const BackgroundParticles = dynamic(() => import('@/components/particles/Backgro
 })
 
 interface BattleResult {
-  localPlayer: PlayerState
-  remotePlayer: PlayerState
+  localPlayer?: PlayerState
+  remotePlayer?: PlayerState
   winnerId: string
   localPlayerId: string
-  newlyUnlockedPower: PowerId | null
-  roomCode: string
-  remotePlayerId: string
+  localHp?: number
+  remoteHp?: number
+  localName?: string
+  remoteName?: string
+  newlyUnlockedPower?: PowerId | null
+  roomCode?: string
+  remotePlayerId?: string
 }
 
 export default function ResultsPage() {
@@ -37,8 +41,40 @@ export default function ResultsPage() {
     const raw = sessionStorage.getItem('battleResult')
     if (raw) {
       try {
-        const parsed = JSON.parse(raw) as BattleResult
-        setResult(parsed)
+        const parsed = JSON.parse(raw)
+        // Normalise legacy flat format (winnerId, localName, remoteName, localHp, remoteHp)
+        // into the BattleResult shape the page expects.
+        if (!parsed.localPlayer) {
+          parsed.localPlayer = {
+            id: parsed.localPlayerId ?? 'local',
+            displayName: parsed.localName ?? 'You',
+            hp: parsed.localHp ?? 0,
+            maxHp: 100,
+            activePower: null,
+            statusEffects: [],
+            statusTimers: {},
+            cooldowns: {},
+            unlockedPowers: ['fire_punch', 'shield', 'zap_shot', 'heal'],
+            winStreak: 0,
+            hasUsedFullRestore: false,
+          }
+        }
+        if (!parsed.remotePlayer) {
+          parsed.remotePlayer = {
+            id: parsed.remotePlayerId ?? 'remote',
+            displayName: parsed.remoteName ?? 'Opponent',
+            hp: parsed.remoteHp ?? 0,
+            maxHp: 100,
+            activePower: null,
+            statusEffects: [],
+            statusTimers: {},
+            cooldowns: {},
+            unlockedPowers: ['fire_punch', 'shield', 'zap_shot', 'heal'],
+            winStreak: 0,
+            hasUsedFullRestore: false,
+          }
+        }
+        setResult(parsed as BattleResult)
       } catch {
         router.push('/')
       }
@@ -87,7 +123,7 @@ export default function ResultsPage() {
       const res = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName: result.localPlayer.displayName }),
+        body: JSON.stringify({ displayName: result.localPlayer?.displayName ?? 'Player' }),
       })
       if (!res.ok) throw new Error('Failed to create room')
       const { roomCode: newCode } = await res.json()
@@ -103,7 +139,7 @@ export default function ResultsPage() {
     router.push('/')
   }
 
-  if (!result) return null
+  if (!result || !result.localPlayer || !result.remotePlayer) return null
 
   const isLocalWinner = result.winnerId === result.localPlayerId
   const localXP = isLocalWinner ? 100 : 40
