@@ -197,7 +197,7 @@ export function useGameState(
     }, projectile.duration + 100)
   }, [])
 
-  const addImpact = useCallback((power: PowerId, targetSide: PlayerSide) => {
+  const addImpact = useCallback((power: PowerId, targetSide: PlayerSide, durationMs = 700) => {
     const impact = {
       id: generateId(),
       type: power,
@@ -213,7 +213,7 @@ export function useGameState(
         ...prev,
         activeImpacts: prev.activeImpacts.filter((imp) => imp.id !== impact.id),
       }))
-    }, 700)
+    }, durationMs)
   }, [])
 
   const addFloatingText = useCallback((text: string, targetSide: PlayerSide, canvasWidth: number, canvasHeight: number) => {
@@ -289,6 +289,11 @@ export function useGameState(
 
       // Trigger attack animations for BOTH local and remote attacks on server confirmation
       if (event.type === 'attack' && event.power) {
+        // Shield activation — show persistent shield dome on attacker's tile
+        if (event.power === 'shield') {
+          addImpact('shield' as PowerId, attackerSide, 5000)
+          return
+        }
         // For remote attacker: add projectile AND gesture activation overlay on remote tile
         if (!attackerIsLocal) {
           addProjectile(event.power, attackerSide)
@@ -331,8 +336,56 @@ export function useGameState(
       }
 
       if (event.type === 'heal' && event.healAmount && event.healAmount > 0) {
-addImpact('heal' as PowerId, attackerSide)
-      addFloatingText(`+${event.healAmount} HP`, attackerSide, 400, 300)
+        addImpact('heal' as PowerId, attackerSide, 1200)
+        addFloatingText(`+${event.healAmount} HP`, attackerSide, 400, 300)
+      }
+
+      // ── Persistent status-effect overlays driven by server state ───────────
+      // Applied after the room state update so tileFilters reflect new statusEffects.
+      if (event.type === 'status_apply' && event.status) {
+        const affectedSide: PlayerSide = event.targetId === localPlayerId ? 'local' : 'remote'
+        switch (event.status) {
+          case 'frozen':
+            setAnimationState((prev) => ({
+              ...prev,
+              tileFilters: {
+                ...prev.tileFilters,
+                [affectedSide]: { ...prev.tileFilters[affectedSide], hueRotate: 180, saturate: 0.4 },
+              },
+            }))
+            break
+          case 'reflect':
+            setAnimationState((prev) => ({
+              ...prev,
+              tileFilters: {
+                ...prev.tileFilters,
+                [affectedSide]: { ...prev.tileFilters[affectedSide], saturate: 2 },
+              },
+            }))
+            break
+          case 'burning':
+            setAnimationState((prev) => ({
+              ...prev,
+              tileFilters: {
+                ...prev.tileFilters,
+                [affectedSide]: { ...prev.tileFilters[affectedSide], contrast: 1.4 },
+              },
+            }))
+            break
+          default:
+            break
+        }
+      }
+
+      if (event.type === 'status_expire' && event.status) {
+        const affectedSide: PlayerSide = event.targetId === localPlayerId ? 'local' : 'remote'
+        setAnimationState((prev) => ({
+          ...prev,
+          tileFilters: {
+            ...prev.tileFilters,
+            [affectedSide]: { grayscale: 0, sepia: 0, hueRotate: 0, saturate: 1, brightness: 1, contrast: 1 },
+          },
+        }))
       }
 
       setRoomData((prev) => {

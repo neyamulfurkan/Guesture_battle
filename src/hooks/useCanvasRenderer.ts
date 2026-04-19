@@ -24,6 +24,7 @@ import {
   drawIceFreezeOverlay,
   drawReflectDome,
   drawScreenShake,
+  drawShieldDome,
   drawThunderBolt,
   drawZapImpact,
   drawZapShot,
@@ -211,22 +212,72 @@ const dpr = window.devicePixelRatio || 1
       }
     }
 
-    // ── Status overlays ─────────────────────────────────────────────────────
-    if (!disableFaceOverlaysRef.current) {
-      const tileFilter = state.tileFilters[playerSide]
+    // ── Status overlays (persistent, driven by tileFilters & activeImpacts) ──
+    const tileFilter = state.tileFilters[playerSide]
 
-      if (tileFilter) {
-        // Ice freeze overlay when frozen
-        if (tileFilter.hueRotate > 0) {
-          drawIceFreezeOverlay(ctx, displayWidth, displayHeight, true, now)
-        }
-      }
+    // Ice freeze — hueRotate set when 'frozen' status is active
+    if (tileFilter && tileFilter.hueRotate > 0) {
+      drawIceFreezeOverlay(ctx, displayWidth, displayHeight, true, now)
     }
 
-    // Reflect dome if active — check via tile filter saturate as proxy
-    const hasDome = state.tileFilters[playerSide]?.saturate > 1
+    // Reflect dome — saturate > 1 signals 'reflect' status active
+    const hasDome = tileFilter?.saturate > 1
     if (hasDome) {
       drawReflectDome(ctx, displayWidth, displayHeight, now)
+    }
+
+    // Shield dome — drawn whenever a 'shield' impact is in the active impacts list for this side
+    // OR whenever we have an active shield status (checked via a persistent shield impact)
+    const hasActiveShield = state.activeImpacts.some(
+      (imp) => imp.type === 'shield' && imp.side === playerSide
+    )
+    if (hasActiveShield) {
+      const centerRegion = new DOMRect(
+        displayWidth * 0.15,
+        displayHeight * 0.1,
+        displayWidth * 0.7,
+        displayHeight * 0.75
+      )
+      drawShieldDome(ctx, centerRegion, true, false, now)
+    }
+
+    // Burning overlay — contrast > 1 signals 'burning' status active
+    if (tileFilter && tileFilter.contrast > 1.1) {
+      // Draw animated fire tint over the tile
+      ctx.save()
+      const burnPulse = 0.08 + Math.sin(now * 0.006) * 0.04
+      ctx.fillStyle = `rgba(249,115,22,${burnPulse})`
+      ctx.fillRect(0, 0, displayWidth, displayHeight)
+      // Animated fire border
+      const borderGlow = Math.abs(Math.sin(now * 0.005)) * 0.7 + 0.3
+      ctx.strokeStyle = `rgba(249,115,22,${borderGlow})`
+      ctx.lineWidth = 4
+      ctx.shadowColor = '#f97316'
+      ctx.shadowBlur = 18
+      ctx.strokeRect(2, 2, displayWidth - 4, displayHeight - 4)
+      ctx.restore()
+    }
+
+    // Healing glow — draw when heal impact is active on this side
+    const hasHealImpact = state.activeImpacts.some(
+      (imp) => (imp.type === 'heal' || imp.type === 'full_restore') && imp.side === playerSide
+    )
+    if (hasHealImpact) {
+      ctx.save()
+      const healT = Date.now() % 1200 / 1200
+      const healPulse = Math.sin(healT * Math.PI) * 0.12
+      ctx.fillStyle = `rgba(34,197,94,${healPulse})`
+      ctx.fillRect(0, 0, displayWidth, displayHeight)
+      ctx.strokeStyle = `rgba(34,197,94,${0.4 + healPulse * 2})`
+      ctx.lineWidth = 3
+      ctx.shadowColor = '#22c55e'
+      ctx.shadowBlur = 20
+      ctx.strokeRect(2, 2, displayWidth - 4, displayHeight - 4)
+      ctx.restore()
+      // Healing particles rising
+      if (perf !== 'minimal') {
+        particleSystemRef.current.emit('healing', displayWidth * 0.3 + Math.random() * displayWidth * 0.4, displayHeight * 0.8, 2)
+      }
     }
 
     // Thunder bolt — drawn on target tile for thunder_smash impacts
@@ -237,10 +288,33 @@ const dpr = window.devicePixelRatio || 1
       drawThunderBolt(ctx, displayWidth, displayHeight, now)
     }
 
-    // ── Crack overlay (low HP) ───────────────────────────────────────────────
-    const filter = state.tileFilters[playerSide]
-    if (filter && filter.contrast > 1) {
-      const intensity = clamp((filter.contrast - 1) / 0.5, 0, 1)
+    // Stun/frozen sparkle overlay
+    const hasIceFreezeImpact = state.activeImpacts.some(
+      (imp) => imp.type === 'ice_freeze' && imp.side === playerSide
+    )
+    if (hasIceFreezeImpact || (tileFilter && tileFilter.hueRotate > 0)) {
+      if (perf !== 'minimal') {
+        particleSystemRef.current.emit('lightning', Math.random() * displayWidth, Math.random() * displayHeight, 1)
+      }
+    }
+
+    // War cry aura — sepia signals war_cry status
+    if (tileFilter && tileFilter.sepia > 0) {
+      ctx.save()
+      const warPulse = 0.06 + Math.abs(Math.sin(now * 0.008)) * 0.06
+      ctx.fillStyle = `rgba(249,115,22,${warPulse})`
+      ctx.fillRect(0, 0, displayWidth, displayHeight)
+      ctx.strokeStyle = `rgba(234,179,8,${0.5 + warPulse * 3})`
+      ctx.lineWidth = 3
+      ctx.shadowColor = '#eab308'
+      ctx.shadowBlur = 16
+      ctx.strokeRect(2, 2, displayWidth - 4, displayHeight - 4)
+      ctx.restore()
+    }
+
+    // ── Crack overlay (critical HP) ──────────────────────────────────────────
+    if (tileFilter && tileFilter.contrast > 1 && tileFilter.contrast <= 1.1) {
+      const intensity = clamp((tileFilter.contrast - 1) / 0.1, 0, 1)
       drawCrackOverlay(ctx, displayWidth, displayHeight, intensity)
     }
 
