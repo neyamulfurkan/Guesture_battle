@@ -63,6 +63,11 @@ export class GestureEngine {
   private videoElement: HTMLVideoElement | null = null
   private onGestureCallback: (gesture: GestureId) => void
 
+  // Null-frame tolerance: how many consecutive null frames before resetting counts
+  // Prevents a single dropped frame from breaking a hold gesture like shield
+  private nullFrameCount: number = 0
+  private static readonly NULL_FRAME_TOLERANCE = 4
+
   // Swipe tracking
   private palmPositionHistory: Array<{ x: number; y: number; frame: number }> = []
   private swipeFrameCounter: number = 0
@@ -191,6 +196,7 @@ export class GestureEngine {
     }
 
     this.stateMachine.reset()
+    this.nullFrameCount = 0
     this.palmPositionHistory = []
     this.palmAreaHistory = []
     this.wristSpinHistory = []
@@ -209,11 +215,17 @@ export class GestureEngine {
     this.swipeFrameCounter++
 
     if (gesture === null) {
-      // No gesture detected this frame — reset all counts so gestures
-      // must be held continuously for the required frames without interruption
-      this.stateMachine.reset()
+      // Allow a few null frames before resetting — prevents single dropped frames
+      // from breaking hold gestures like shield that require many consecutive frames
+      this.nullFrameCount++
+      if (this.nullFrameCount >= GestureEngine.NULL_FRAME_TOLERANCE) {
+        this.stateMachine.reset()
+        this.nullFrameCount = 0
+      }
       return
     }
+
+    this.nullFrameCount = 0
 
     const requiredFrames = this.getRequiredFrames(gesture)
     const confirmed = this.stateMachine.confirmGesture(gesture, requiredFrames)
@@ -291,22 +303,26 @@ export class GestureEngine {
     const palmCenter = px(9) // landmark 9 is middle finger MCP, good palm center proxy
 
     // ─── FIST ──────────────────────────────────────────────────────
-    // All four finger tips must be close to palm center AND thumb tip close to index MCP
-    const fistThreshold = 50
+    // All four finger tips close to palm center AND thumb tip close to index MCP.
+    // Use stricter threshold (40px) to avoid false fist during open-palm transitions.
+    const fistThreshold = 40
     const allCurled =
       distancePx(indexTip.x, indexTip.y, palmCenter.x, palmCenter.y) < fistThreshold &&
       distancePx(middleTip.x, middleTip.y, palmCenter.x, palmCenter.y) < fistThreshold &&
       distancePx(ringTip.x, ringTip.y, palmCenter.x, palmCenter.y) < fistThreshold &&
       distancePx(pinkyTip.x, pinkyTip.y, palmCenter.x, palmCenter.y) < fistThreshold &&
-      distancePx(thumbTip.x, thumbTip.y, indexMcp.x, indexMcp.y) < fistThreshold * 1.4
+      distancePx(thumbTip.x, thumbTip.y, indexMcp.x, indexMcp.y) < fistThreshold * 1.5
 
     if (allCurled) return 'fist'
 
     // ─── OPEN PALM ─────────────────────────────────────────────────
-    const extendThreshold = 60
-    const thumbMcp = px(2)
+    // Use landmark 1 (thumb CMC base) instead of 2 for more stable thumb extension measure.
+    // Require all four fingers AND thumb extended. Use 55px threshold — reliable across
+    // hand sizes and distances without being too strict.
+    const extendThreshold = 55
+    const thumbCmc = px(1)
     const allExtended =
-      distancePx(thumbTip.x, thumbTip.y, thumbMcp.x, thumbMcp.y) > extendThreshold &&
+      distancePx(thumbTip.x, thumbTip.y, thumbCmc.x, thumbCmc.y) > extendThreshold * 1.4 &&
       distancePx(indexTip.x, indexTip.y, indexMcp.x, indexMcp.y) > extendThreshold &&
       distancePx(middleTip.x, middleTip.y, middleMcp.x, middleMcp.y) > extendThreshold &&
       distancePx(ringTip.x, ringTip.y, ringMcp.x, ringMcp.y) > extendThreshold &&

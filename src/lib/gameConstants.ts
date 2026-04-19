@@ -3,7 +3,7 @@
 // Edit ONLY this file when balancing the game.
 
 // ─── GESTURE ─────────────────────────────────────────────────────────────────
-export const GESTURE_HOLD_FRAMES_SHIELD = 24
+export const GESTURE_HOLD_FRAMES_SHIELD = 8
 export const GESTURE_HOLD_FRAMES_PUNCH = 3
 export const GESTURE_HOLD_FRAMES_ZAP = 3
 export const GESTURE_HOLD_FRAMES_HEAL = 5
