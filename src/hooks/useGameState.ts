@@ -337,25 +337,42 @@ addImpact('heal' as PowerId, attackerSide)
 
       setRoomData((prev) => {
         if (!prev) return prev
+
+        // Always use server-authoritative HP values directly.
+        // applyGameEvent is used only to derive status effects and cooldowns,
+        // but HP is always taken from the server broadcast — never from client recompute.
         const updatedRoom = applyGameEvent(prev, event)
 
-        // HP reconciliation: if server HP diverges beyond threshold, snap with flash
         const localSide: PlayerSide = 'local'
         const remoteSide: PlayerSide = 'remote'
 
-        const localHpDiff = Math.abs((localState?.hp ?? updatedRoom.localPlayer.hp) - updatedRoom.localPlayer.hp)
-        const remoteHpDiff = Math.abs((remoteState?.hp ?? updatedRoom.remotePlayer.hp) - updatedRoom.remotePlayer.hp)
-
+        // Always snap to server HP — server is always authoritative on HP
         let reconciledLocal = updatedRoom.localPlayer
         let reconciledRemote = updatedRoom.remotePlayer
 
-        if (localHpDiff > HP_RECONCILE_SNAP_THRESHOLD && localState) {
-          reconciledLocal = { ...updatedRoom.localPlayer, hp: localState.hp }
-          triggerCorrectionFlash(localSide)
+        if (localState) {
+          if (Math.abs(localState.hp - updatedRoom.localPlayer.hp) > HP_RECONCILE_SNAP_THRESHOLD) {
+            triggerCorrectionFlash(localSide)
+          }
+          reconciledLocal = {
+            ...updatedRoom.localPlayer,
+            hp: localState.hp,
+            id: localState.id !== '' ? localState.id : updatedRoom.localPlayer.id,
+            displayName: localState.displayName || updatedRoom.localPlayer.displayName,
+            unlockedPowers: localState.unlockedPowers && localState.unlockedPowers.length > 0 ? localState.unlockedPowers : updatedRoom.localPlayer.unlockedPowers,
+          }
         }
-        if (remoteHpDiff > HP_RECONCILE_SNAP_THRESHOLD && remoteState) {
-          reconciledRemote = { ...updatedRoom.remotePlayer, hp: remoteState.hp }
-          triggerCorrectionFlash(remoteSide)
+        if (remoteState) {
+          if (Math.abs(remoteState.hp - updatedRoom.remotePlayer.hp) > HP_RECONCILE_SNAP_THRESHOLD) {
+            triggerCorrectionFlash(remoteSide)
+          }
+          reconciledRemote = {
+            ...updatedRoom.remotePlayer,
+            hp: remoteState.hp,
+            id: remoteState.id !== '' ? remoteState.id : updatedRoom.remotePlayer.id,
+            displayName: remoteState.displayName || updatedRoom.remotePlayer.displayName,
+            unlockedPowers: remoteState.unlockedPowers && remoteState.unlockedPowers.length > 0 ? remoteState.unlockedPowers : updatedRoom.remotePlayer.unlockedPowers,
+          }
         }
 
         return {
@@ -392,7 +409,9 @@ addImpact('heal' as PowerId, attackerSide)
 
       const localPlayer = room.localPlayer
       const now = Date.now()
-      const { valid } = validateAttack(localPlayer, power, now)
+      // Add 300ms grace period on client to account for network latency between
+      // client emit time and server validation time. Server is still authoritative.
+      const { valid } = validateAttack(localPlayer, power, now + 300)
       if (!valid) return
 
       seqCounterRef.current += 1
@@ -483,55 +502,6 @@ addImpact('heal' as PowerId, attackerSide)
 
       const def = POWER_DEFINITIONS[singlePower]
       if (!def) return
-
-      // Check if this gesture alone maps to a defend/heal type power
-      if (def.effect === 'shield' || singlePower === 'shield') {
-        const room = roomDataRef.current
-        if (!room) return
-        const localPlayer = room.localPlayer
-        const actionTime = Date.now()
-        const { valid } = validateAttack(localPlayer, singlePower, actionTime)
-        if (!valid) return
-
-        seqCounterRef.current += 1
-        const payload: SocketAttackPayload = {
-          roomCode,
-          playerId: localPlayerId,
-          power: singlePower,
-          sequenceNumber: seqCounterRef.current,
-          timestamp: actionTime,
-        }
-        socket?.emit(SOCKET_EVENTS.GAME_EVENT, payload)
-        // Optimistically update cooldown
-        const updatedRoom = { ...room, localPlayer: { ...room.localPlayer, cooldowns: { ...room.localPlayer.cooldowns, [singlePower]: actionTime } } }
-        roomDataRef.current = updatedRoom
-        setRoomData(updatedRoom)
-        return
-      }
-
-      if (singlePower === 'heal') {
-        const room = roomDataRef.current
-        if (!room) return
-        const localPlayer = room.localPlayer
-        const actionTime = Date.now()
-        const { valid } = validateAttack(localPlayer, singlePower, actionTime)
-        if (!valid) return
-
-        seqCounterRef.current += 1
-        const payload: SocketAttackPayload = {
-          roomCode,
-          playerId: localPlayerId,
-          power: singlePower,
-          sequenceNumber: seqCounterRef.current,
-          timestamp: actionTime,
-        }
-        socket?.emit(SOCKET_EVENTS.GAME_EVENT, payload)
-        // Optimistically update cooldown
-        const updatedRoom = { ...room, localPlayer: { ...room.localPlayer, cooldowns: { ...room.localPlayer.cooldowns, [singlePower]: actionTime } } }
-        roomDataRef.current = updatedRoom
-        setRoomData(updatedRoom)
-        return
-      }
 
       emitAttack(singlePower)
     },

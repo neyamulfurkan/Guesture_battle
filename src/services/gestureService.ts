@@ -208,7 +208,12 @@ export class GestureEngine {
     const gesture = this.detectGesture(results)
     this.swipeFrameCounter++
 
-    if (gesture === null) return
+    if (gesture === null) {
+      // No gesture detected this frame — reset all counts so gestures
+      // must be held continuously for the required frames without interruption
+      this.stateMachine.reset()
+      return
+    }
 
     const requiredFrames = this.getRequiredFrames(gesture)
     const confirmed = this.stateMachine.confirmGesture(gesture, requiredFrames)
@@ -286,12 +291,14 @@ export class GestureEngine {
     const palmCenter = px(9) // landmark 9 is middle finger MCP, good palm center proxy
 
     // ─── FIST ──────────────────────────────────────────────────────
+    // All four finger tips must be close to palm center AND thumb tip close to index MCP
     const fistThreshold = 50
     const allCurled =
       distancePx(indexTip.x, indexTip.y, palmCenter.x, palmCenter.y) < fistThreshold &&
       distancePx(middleTip.x, middleTip.y, palmCenter.x, palmCenter.y) < fistThreshold &&
       distancePx(ringTip.x, ringTip.y, palmCenter.x, palmCenter.y) < fistThreshold &&
-      distancePx(pinkyTip.x, pinkyTip.y, palmCenter.x, palmCenter.y) < fistThreshold
+      distancePx(pinkyTip.x, pinkyTip.y, palmCenter.x, palmCenter.y) < fistThreshold &&
+      distancePx(thumbTip.x, thumbTip.y, indexMcp.x, indexMcp.y) < fistThreshold * 1.4
 
     if (allCurled) return 'fist'
 
@@ -332,9 +339,13 @@ export class GestureEngine {
       return 'peace_sign'
 
     // ─── SHAKA ─────────────────────────────────────────────────────
+    // Shaka (hang loose): thumb and pinky both extended, middle/ring/index curled.
+    // Detection uses distance from wrist — works regardless of hand rotation.
     const shakaThreshold = 50
-    const thumbUpFromWrist = wrist.y - thumbTip.y > shakaThreshold // thumb tip is above wrist
-    const pinkyDownFromWrist = pinkyTip.y - wrist.y > shakaThreshold // pinky extends below wrist
+    const thumbExtendedFromWrist =
+      distancePx(thumbTip.x, thumbTip.y, wrist.x, wrist.y) > shakaThreshold * 1.5
+    const pinkyExtendedFromWrist =
+      distancePx(pinkyTip.x, pinkyTip.y, wrist.x, wrist.y) > shakaThreshold
     const middleCurledShaka =
       distancePx(middleTip.x, middleTip.y, middleMcp.x, middleMcp.y) < fistThreshold
     const ringCurledShaka =
@@ -342,7 +353,7 @@ export class GestureEngine {
     const indexCurledShaka =
       distancePx(indexTip.x, indexTip.y, indexMcp.x, indexMcp.y) < fistThreshold
 
-    if (thumbUpFromWrist && pinkyDownFromWrist && middleCurledShaka && ringCurledShaka && indexCurledShaka)
+    if (thumbExtendedFromWrist && pinkyExtendedFromWrist && middleCurledShaka && ringCurledShaka && indexCurledShaka)
       return 'shaka'
 
     // ─── THUMBS UP ─────────────────────────────────────────────────
@@ -360,14 +371,6 @@ export class GestureEngine {
     const thumbBelowWrist = thumbTip.y - wrist.y > thumbsUpThreshold
 
     if (thumbBelowWrist && fingersBelowMcps) return 'thumbs_down'
-
-    // ─── FLAT PALM ─────────────────────────────────────────────────
-    if (allExtended) {
-      const tipYValues = [indexTip.y, middleTip.y, ringTip.y, pinkyTip.y]
-      const minY = Math.min(...tipYValues)
-      const maxY = Math.max(...tipYValues)
-      if (maxY - minY < 30) return 'flat_palm'
-    }
 
     // ─── SWIPE LEFT / SWIPE RIGHT ──────────────────────────────────
     const swipeResult = this.detectSwipe(palmCenter, videoWidth)

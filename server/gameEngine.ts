@@ -22,6 +22,10 @@ import type { ServerRoom } from './roomManager'
 // ─── GAME ENGINE ─────────────────────────────────────────────────────────────
 
 export class GameEngine {
+  // Per-player last processed sequence numbers — keyed by playerId
+  // Prevents replay attacks while allowing both players independent counters
+  private playerSequenceNumbers: Map<string, number> = new Map()
+
   // ── processGameEvent ───────────────────────────────────────────────────────
 
   processGameEvent(room: ServerRoom, event: GameEvent, io: Server): void {
@@ -35,20 +39,36 @@ export class GameEngine {
       return
     }
 
-    // Guard: sequence number must be strictly greater than last processed
-    if (event.sequenceNumber <= room.sequenceNumber) {
+    // Guard: per-player sequence number must be strictly greater than last processed
+    // Uses per-player tracking so Player A and Player B have independent counters
+    const lastPlayerSeq = this.playerSequenceNumbers.get(event.attackerId) ?? 0
+    if (event.sequenceNumber <= lastPlayerSeq) {
       return
     }
+    this.playerSequenceNumbers.set(event.attackerId, event.sequenceNumber)
+
+    const serverNow = Date.now()
 
     if (event.type === 'attack') {
+      // Server-side rate limit: reject if attacker fired within SERVER_RATE_LIMIT_ATTACK_MS
+      const lastAttack = room.lastAttackTimestamp[event.attackerId] ?? 0
+      if (serverNow - lastAttack < SERVER_RATE_LIMIT_ATTACK_MS) {
+        return
+      }
+
       // Validate the attack against the attacker's current state
       const attackerState = this._stateForPlayer(room, event.attackerId)
       if (!attackerState) return
 
-      const validation = validateAttack(attackerState, event.power!, event.timestamp)
+      const validation = validateAttack(attackerState, event.power!, serverNow)
       if (!validation.valid) {
         return
       }
+
+      // Record rate-limit timestamp using server time
+      room.lastAttackTimestamp[event.attackerId] = serverNow
+      // Overwrite client timestamp with server time so cooldown storage is authoritative
+      event.timestamp = serverNow
     }
 
     // Apply the event immutably via gameStateService
@@ -76,6 +96,9 @@ export class GameEngine {
   endGame(room: ServerRoom, winnerId: string, io: Server): void {
     room.state = 'ended'
     room.endedAt = Date.now()
+    // Clear per-player sequence tracking for both players so a rematch starts clean
+    if (room.localPlayer.id) this.playerSequenceNumbers.delete(room.localPlayer.id)
+    if (room.remotePlayer.id) this.playerSequenceNumbers.delete(room.remotePlayer.id)
 
     const loserId =
       room.localPlayer.id === winnerId ? room.remotePlayer.id : room.localPlayer.id
