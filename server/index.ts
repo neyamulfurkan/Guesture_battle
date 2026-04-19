@@ -83,6 +83,8 @@ io.on('connection', (socket: Socket) => {
         const rejoined = roomManager.rejoinPlayer(code, playerId, socket.id, io)
         if (rejoined) {
           socket.join(code)
+          // Reset sequence number so battle-page attacks are never rejected as replays
+          gameEngine.resetPlayerSequence(playerId)
           callback?.({})
         } else {
           callback?.({ error: 'Could not reconnect to room. Please create a new room.' })
