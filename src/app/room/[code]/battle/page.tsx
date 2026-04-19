@@ -240,6 +240,16 @@ export default function BattlePage() {
     }, (res?: { error?: string }) => {
       if (res?.error) {
         addToast(res.error, 'error')
+        // Room no longer exists on server (server restart or session expired).
+        // Redirect to home so user can create a new room.
+        if (
+          res.error.includes('does not exist') ||
+          res.error.includes('already started') ||
+          res.error.includes('full')
+        ) {
+          setTimeout(() => router.push('/'), 2000)
+          return
+        }
       }
       // After rejoining, initiate WebRTC
       initiate(isInitiator).catch((err: Error) => {
@@ -347,7 +357,18 @@ export default function BattlePage() {
     }
 
     const handleSocketError = (err: { message: string }) => {
-      addToast(err?.message ?? 'Connection error. Please refresh.', 'error')
+      const message = err?.message ?? 'Connection error. Please refresh.'
+      addToast(message, 'error')
+      // If room is not found or player not registered, the battle cannot continue
+      if (
+        message.includes('not found') ||
+        message.includes('not registered') ||
+        message.includes('expired')
+      ) {
+        setTimeout(() => {
+          router.push('/')
+        }, 2500)
+      }
     }
 
     const handleRoomStateChange = (data: { state: string; localPlayerId?: string }) => {

@@ -160,12 +160,16 @@ io.on('connection', (socket: Socket) => {
   // ── GAME EVENT ─────────────────────────────────────────────────────────────
   socket.on(SOCKET_EVENTS.GAME_EVENT, (payload: SocketAttackPayload) => {
     try {
-      if (!payload || !payload.roomCode || !payload.playerId || !payload.power) return
+      if (!payload || !payload.roomCode || !payload.playerId || !payload.power) {
+        console.log(`GAME_EVENT dropped: invalid payload`, payload)
+        return
+      }
       const code = payload.roomCode.toUpperCase()
       const room = roomManager.getRoom(code)
 
       if (!room) {
-        socket.emit(SOCKET_EVENTS.ERROR, { message: 'Room not found.' })
+        console.log(`GAME_EVENT dropped: room '${code}' not found. Available rooms: [${roomManager.listRooms().map(r => r.code).join(', ')}]`)
+        socket.emit(SOCKET_EVENTS.ERROR, { message: `Room not found. Your session may have expired — please go back and create a new room.` })
         return
       }
 
@@ -175,13 +179,14 @@ io.on('connection', (socket: Socket) => {
       // Guard: only process game events when room is in battle state
       if (room.state !== 'battle') {
         console.log(`GAME_EVENT dropped: room ${code} state is '${room.state}', not 'battle'. playerId=${playerId} power=${power}`)
+        socket.emit(SOCKET_EVENTS.ERROR, { message: `Battle not started yet. Room is in '${room.state}' state.` })
         return
       }
 
       // Guard: player must be registered in this room
       if (!roomManager.isPlayerInRoom(code, playerId)) {
-        console.log(`GAME_EVENT dropped: playerId=${playerId} not found in room ${code}`)
-        socket.emit(SOCKET_EVENTS.ERROR, { message: 'You are not registered in this room. Please rejoin.' })
+        console.log(`GAME_EVENT dropped: playerId=${playerId} not found in room ${code}. Known players: [${Object.keys(room.playerIdToSide).join(', ')}]`)
+        socket.emit(SOCKET_EVENTS.ERROR, { message: 'Player not found in room. Please go back and rejoin.' })
         return
       }
 
