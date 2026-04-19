@@ -45,7 +45,17 @@ export function useSocket(): {
       setIsConnected(false)
     })
 
+    // Keep Render/Railway free tier alive — ping every 4 minutes
+    // Render spins down after 15 minutes of no HTTP traffic
+    const keepAliveInterval = setInterval(() => {
+      const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL
+      if (socketUrl) {
+        fetch(`${socketUrl}/ping`, { method: 'GET' }).catch(() => {})
+      }
+    }, 240_000)
+
     return () => {
+      clearInterval(keepAliveInterval)
       socket.disconnect()
       socketRef.current = null
       setSocket(null)

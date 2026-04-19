@@ -29,6 +29,11 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', rooms: roomManager.getRoomCount() })
 })
 
+// Keep-alive endpoint — prevents Render free tier spin-down
+app.get('/ping', (_req, res) => {
+  res.json({ pong: true, ts: Date.now() })
+})
+
 app.get('/rooms/:code', (req, res) => {
   const { code } = req.params
   const room = roomManager.getRoom(code.toUpperCase())

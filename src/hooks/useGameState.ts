@@ -403,7 +403,7 @@ addImpact('heal' as PowerId, attackerSide)
 
   const emitAttack = useCallback(
     (power: PowerId) => {
-      if (!socket) return
+      if (!socket || !socket.connected) return
       const room = roomDataRef.current
       if (!room || !isRoomStateValid(room.state, 'attack')) return
 

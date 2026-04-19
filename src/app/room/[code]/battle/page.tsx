@@ -217,22 +217,16 @@ export default function BattlePage() {
 
   // ── Rejoin room with new socket ID, then initiate WebRTC ───────────────────
   const hasInitiatedWebRTC = useRef(false)
+  const hasJoinedRoomRef = useRef(false)
 
-  useEffect(() => {
-    if (!socket || !isConnected) return
-    if (hasInitiatedWebRTC.current) return
-    hasInitiatedWebRTC.current = true
-
+  const joinRoomOnServer = useCallback(() => {
+    if (!socket) return
     const storedRoomCode = sessionStorage.getItem('roomCode') ?? roomCode
-    // Use localPlayerId (from useRef/generateLocalPlayerId) as the single source of truth.
-    // This is the same ID passed to useGameState and used in all attack emissions.
     const storedDisplayName = sessionStorage.getItem('displayName') ?? 'Player'
-    const isInitiator = sessionStorage.getItem('isInitiator') === 'true'
 
     // Ensure sessionStorage is in sync with the ID we will use for attacks
     sessionStorage.setItem('playerId', localPlayerId)
 
-    // Rejoin the socket room so server has our new socket ID
     socket.emit('join_room', {
       roomCode: storedRoomCode,
       playerId: localPlayerId,
@@ -240,23 +234,32 @@ export default function BattlePage() {
     }, (res?: { error?: string }) => {
       if (res?.error) {
         addToast(res.error, 'error')
-        // Room no longer exists on server (server restart or session expired).
-        // Redirect to home so user can create a new room.
+        // Server restarted and room is gone — redirect home
         if (
           res.error.includes('does not exist') ||
-          res.error.includes('already started') ||
           res.error.includes('full')
         ) {
           setTimeout(() => router.push('/'), 2000)
           return
         }
       }
-      // After rejoining, initiate WebRTC
-      initiate(isInitiator).catch((err: Error) => {
-        addToast(err.message, 'error')
-      })
-      // Signal server that this peer is ready so battle state transition fires
+      hasJoinedRoomRef.current = true
       socket.emit('peer_ready', { roomCode: storedRoomCode })
+    })
+  }, [socket, roomCode, localPlayerId, addToast, router])
+
+  useEffect(() => {
+    if (!socket || !isConnected) return
+    if (hasInitiatedWebRTC.current) return
+    hasInitiatedWebRTC.current = true
+
+    const isInitiator = sessionStorage.getItem('isInitiator') === 'true'
+
+    joinRoomOnServer()
+
+    // After joining, initiate WebRTC
+    initiate(isInitiator).catch((err: Error) => {
+      addToast(err.message, 'error')
     })
 
     // Fallback: if ROOM_STATE_CHANGE fired before our listener registered, start countdown
@@ -268,6 +271,22 @@ export default function BattlePage() {
       clearTimeout(fallbackTimer)
     }
   }, [socket, isConnected]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-join room on socket reconnect (handles Render free tier spin-down/restart)
+  useEffect(() => {
+    if (!socket) return
+
+    const handleReconnect = () => {
+      hasJoinedRoomRef.current = false
+      addToast('Reconnecting to server...', 'info')
+      joinRoomOnServer()
+    }
+
+    socket.on('connect', handleReconnect)
+    return () => {
+      socket.off('connect', handleReconnect)
+    }
+  }, [socket, joinRoomOnServer, addToast])
 
   // ── Fallback toast ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -624,6 +643,28 @@ export default function BattlePage() {
         settings={settings}
         onSettingsChange={setSettings}
       />
+
+      {/* Connection status indicator */}
+      {!isConnected && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 12,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 50,
+            padding: '6px 16px',
+            background: 'rgba(239,68,68,0.15)',
+            border: '1px solid rgba(239,68,68,0.5)',
+            borderRadius: 8,
+            fontSize: 12,
+            color: '#ef4444',
+            pointerEvents: 'none',
+          }}
+        >
+          ⚠ Reconnecting to server…
+        </div>
+      )}
 
       {/* Performance mode indicator (development hint) */}
       {performanceMode !== 'full' && (
